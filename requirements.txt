@@ -1,0 +1,2 @@
+# agent_50.py: keyless DuckDuckGo web search
+ddgs==9.16.0
