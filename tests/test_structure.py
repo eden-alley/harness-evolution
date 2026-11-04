@@ -55,11 +55,11 @@ with patch.dict(os.environ, {"DEEPSEEK_API_KEY": "", "API_KEY": ""}), patch("ope
         with tempfile.TemporaryDirectory() as directory:
             workspace = Workspace(directory)
             toolset = tools.Toolset(workspace, run_command=runner)
-            self.assertEqual(toolset.execute("run_shell", {"command": "fixture"}),
+            self.assertEqual(toolset.execute("run_shell", {"command": "fixture"}).data,
                              "[exit 0]\n测试输出")
             self.assertEqual(calls, [("fixture", workspace.root, 30)])
             self.assertIn("工作区之外", toolset.execute(
-                "write_file", {"path": "../escape", "content": "no"}))
+                "write_file", {"path": "../escape", "content": "no"}).message)
 
 
 if __name__ == "__main__":

@@ -9,7 +9,6 @@ from unittest.mock import patch
 from scenario_support import (OfflineScenario, agent, context, token_usage,
                               answer, call, tool_reply)
 from test_context import history
-from test_exit_check import verdict
 
 
 class NewSessionScenarios(OfflineScenario):
@@ -56,8 +55,8 @@ class NewSessionScenarios(OfflineScenario):
         self.assertEqual(self.all_requests, [])
         self.assertEqual(list(self.workspace.iterdir()), [])
 
-    def test_new_task_and_followups_keep_tools_checks_tokens_and_restart_history(self):
-        """执行和检查都不夹带旧任务；新任务的追问、工具记录和 token 累计仍保留。"""
+    def test_new_task_and_followups_keep_tools_tokens_and_restart_history(self):
+        """默认无额外验收；新任务和追问保留工具记录与累计，不夹带旧任务。"""
         old = [{"role": "system", "content": agent.SYSTEM},
                {"role": "user", "content": "旧任务专属标记 OLD-TASK"}, answer("旧任务已完成")]
         self.store.save("default", old)
@@ -68,10 +67,6 @@ class NewSessionScenarios(OfflineScenario):
             (answer("已读取新文件"), 20),
             (answer("仍记得新文件内容"), 30),
             (answer("重启后仍是新任务"), 40),
-        ], check_replies=[
-            (verdict("completed", "已读取并回答"), 5),
-            (verdict("completed", "已回答追问"), 7),
-            (verdict("completed", "已根据恢复的当前会话回答"), 9),
         ])
         task = "读取 seed.txt，开始新任务"
         followup = "刚才读取的内容是什么？"
@@ -81,28 +76,26 @@ class NewSessionScenarios(OfflineScenario):
         self.assertEqual(self.requests[0]["messages"], [
             {"role": "system", "content": agent.SYSTEM}, {"role": "user", "content": task}])
         self.assertIn({"role": "user", "content": task}, self.requests[2]["messages"])
-        self.assertIn({"role": "tool", "tool_call_id": "read-new", "content": "新任务文件内容"},
+        self.assertIn({"role": "tool", "tool_call_id": "read-new", "content": json.dumps(
+            {"ok": True, "data": "新任务文件内容"}, ensure_ascii=False)},
                       self.requests[2]["messages"])
         self.assertEqual(self.requests[2]["messages"][-1], {"role": "user", "content": followup})
         saved = self.store.load("default")
         self.assert_complete_tool_pairs(saved)
         self.assertEqual(saved[-1]["content"], "仍记得新文件内容")
-        self.assertEqual(self.agent.token_usage.totals, {"prompt_tokens": 172, "completion_tokens": 15, "total_tokens": 187})
+        self.assertEqual(self.agent.token_usage.totals, {"prompt_tokens": 160, "completion_tokens": 13, "total_tokens": 173})
         for request in self.all_requests:
             self.assertNotIn("OLD-TASK", json.dumps(request, ensure_ascii=False))
             self.assertNotIn('"content": "/new"', json.dumps(request, ensure_ascii=False))
-        reviewed = json.loads(self.check_requests[0]["messages"][1]["content"])
-        self.assertEqual(reviewed["task"], task)
-        self.assertIn({"role": "tool", "tool_call_id": "read-new", "content": "新任务文件内容"},
-                      reviewed["messages"])
+        self.assertEqual(self.check_requests, [])
 
         with patch("builtins.input", side_effect=["继续这项新任务", "quit"]), \
                 contextlib.redirect_stdout(io.StringIO()):
             self.run_cli()
         self.assertEqual(self.requests[3]["messages"][:-1], saved)
-        self.assertEqual(self.agent.token_usage.totals, {"prompt_tokens": 221, "completion_tokens": 17, "total_tokens": 238})
+        self.assertEqual(self.agent.token_usage.totals, {"prompt_tokens": 200, "completion_tokens": 14, "total_tokens": 214})
         self.assertEqual(self.agent.last_prompt_tokens, 40)
-        self.assertEqual(len(self.all_requests), 7)
+        self.assertEqual(len(self.all_requests), 4)
         self.assertNotIn("OLD-TASK", json.dumps(self.all_requests[-2:], ensure_ascii=False))
 
     def test_write_failure_does_not_reset_usage_or_discard_old_session(self):

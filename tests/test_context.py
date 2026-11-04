@@ -10,7 +10,7 @@ import httpx
 from openai import InternalServerError
 
 from scenario_support import (OfflineScenario, agent, context, permissions, tools,
-                              answer, call, tool_reply)
+                              answer, call, tool_reply, tool_text)
 
 
 def history(turns=5):
@@ -83,8 +83,8 @@ class ContextScenarios(OfflineScenario):
         outputs = [m for m in second if m["role"] == "tool"]
         self.assertTrue(all(m["content"].startswith("[旧工具结果已清理") for m in outputs[:-3]))
         self.assertEqual(outputs[-3:-1], [m for m in before if m["role"] == "tool"][-2:])
-        self.assertTrue(outputs[-1]["content"].startswith("HEAD"))
-        self.assertTrue(outputs[-1]["content"].endswith("TAIL"))
+        self.assertTrue(tool_text(outputs[-1]["content"]).startswith("HEAD"))
+        self.assertTrue(tool_text(outputs[-1]["content"]).endswith("TAIL"))
         self.assertIn("中间省略", outputs[-1]["content"])
         self.assertLess(len(outputs[-1]["content"]), 4200)
         self.assertEqual(self.agent.last_prompt_tokens, 100)
@@ -116,7 +116,7 @@ class ContextScenarios(OfflineScenario):
         self.assertIn("旧任务已完成，保留关键路径 file0.txt。", messages[1]["content"])
         self.assertEqual([m["role"] for m in messages[:3]], ["system", "user", "assistant"])
         self.assertEqual(messages[3:3 + len(expected_recent)], expected_recent)
-        self.assertEqual(self.requests[2]["messages"][-1]["content"], "当前文件")
+        self.assertEqual(tool_text(self.requests[2]["messages"][-1]["content"]), "当前文件")
         self.assertEqual(self.agent.last_prompt_tokens, 60)
         self.assertEqual(len(self.requests), 3)
         self.assertEqual(summary_request["thinking"], {"type": "disabled"})
@@ -152,7 +152,7 @@ class ContextScenarios(OfflineScenario):
         self.assertFalse(self.store.directory.is_relative_to(self.workspace))
         decision = permissions.PermissionManager(workspace=self.tools.workspace, ).check("read_file", {"path": str(path)})
         self.assertFalse(decision.allowed)
-        self.assertIn("工作区之外", tools.read_file(self.tools, str(path)))
+        self.assertIn("工作区之外", tools.read_file(self.tools, str(path)).message)
 
         self.agent.last_prompt_tokens = 0  # 模拟重启后的进程初始用量状态。
         with patch("builtins.input", side_effect=["继续", "quit"]), \

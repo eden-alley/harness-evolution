@@ -44,18 +44,21 @@ class NativeSandboxScenarios(OfflineScenario):
         with patch.dict(os.environ, {"DEEPSEEK_API_KEY": "offline-secret",
                                     "OPENAI_API_KEY": "offline-secret", "API_KEY": "offline-secret"}):
             result = tools.run_shell(self.tools, self.python_command(code))
-        self.assertTrue(result.startswith("[exit 0]"), result)
-        self.assertIn("ENV_SECRET=False", result)
+        self.assertTrue(result.ok, result)
+        self.assertTrue(result.data.startswith("[exit 0]"), result)
+        self.assertIn("ENV_SECRET=False", result.data)
         self.assertEqual((self.workspace / "inside.txt").read_text(encoding="utf-8"), "sandbox-ok")
         fixture = self.outside / "existing.txt"
         fixture.write_text("outside-fixture", encoding="utf-8")
         denied = tools.run_shell(self.tools, 'echo should-not-replace> "..\\outside\\existing.txt"')
-        self.assertFalse(denied.startswith("[exit 0]"), denied)
+        self.assertFalse(denied.ok, denied)
+        self.assertFalse(denied.data.startswith("[exit 0]"), denied)
         self.assertEqual(fixture.read_text(encoding="utf-8"), "outside-fixture")
         # 记录内置 workspace 的真实读取范围，不把写隔离误称为全盘读隔离。
         readable = tools.run_shell(self.tools, 'type "..\\outside\\existing.txt"')
-        self.assertTrue(readable.startswith("[exit 0]"), readable)
-        self.assertIn("outside-fixture", readable)
+        self.assertTrue(readable.ok, readable)
+        self.assertTrue(readable.data.startswith("[exit 0]"), readable)
+        self.assertIn("outside-fixture", readable.data)
         self.assertEqual(list(self.workspace.glob(".agent-command-*.cmd")), [])
         self.assertEqual(self.all_requests, [])
 
@@ -68,8 +71,9 @@ class NativeSandboxScenarios(OfflineScenario):
                 "import socket; s=socket.socket(); s.settimeout(1); "
                 f"print('CONNECT_ERR=' + str(s.connect_ex(('127.0.0.1', {port})))); s.close()")
             result = tools.run_shell(self.tools, command)
-        self.assertTrue(result.startswith("[exit 0]"), result)
-        match = re.search(r"CONNECT_ERR=(\d+)", result)
+        self.assertTrue(result.ok, result)
+        self.assertTrue(result.data.startswith("[exit 0]"), result)
+        match = re.search(r"CONNECT_ERR=(\d+)", result.data)
         self.assertIsNotNone(match, result)
         self.assertNotEqual(int(match[1]), 0, "当前离线工作区配置不应连接本地监听端口")
         self.assertEqual(self.all_requests, [])
@@ -82,7 +86,8 @@ class NativeSandboxScenarios(OfflineScenario):
         parent = ("import subprocess, sys, time; "
                   f"subprocess.Popen([sys.executable, '-c', {child!r}]); time.sleep(60)")
         result = tools.run_shell(self.tools, self.python_command(parent), timeout=8)
-        self.assertIn("[超时]", result)
+        self.assertFalse(result.ok)
+        self.assertIn("[超时]", result.message)
         self.assertTrue((self.workspace / "child-ready.txt").exists(),
                         "必须确认子进程已经启动，才能检验超时后的清理")
         (self.workspace / "go.txt").write_text("go", encoding="utf-8")

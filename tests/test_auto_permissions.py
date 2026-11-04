@@ -7,8 +7,7 @@ import unittest
 from unittest.mock import patch
 
 from scenario_support import (OfflineScenario, agent, context, permissions, tools,
-                              token_usage, answer, call, tool_reply)
-from test_exit_check import verdict
+                              token_usage, answer, call, tool_reply, tool_text)
 
 
 class AutoPermissionScenarios(OfflineScenario):
@@ -113,8 +112,7 @@ class AutoPermissionScenarios(OfflineScenario):
             (answer("自动执行完成，已收到拒绝和错误"), 20),
             (tool_reply(call("manual", "write_file", {"path": "note.txt", "content": "覆盖"})), 30),
             (answer("已保留原文件"), 40),
-        ], check_replies=[(verdict("completed", "已核实工具结果"), 5),
-                          (verdict("completed", "已尊重用户拒绝"), 7)])
+        ])
         output = io.StringIO()
         inputs = iter(["/auto on", "/new", "运行自动任务", "/auto off",
                        "试着覆盖文件", "n", "保留原文件", "quit"])
@@ -138,9 +136,9 @@ class AutoPermissionScenarios(OfflineScenario):
         sandbox_run.assert_called_once_with("echo auto-shell-ok", self.workspace, 30)
         outputs = {m["tool_call_id"]: m["content"] for m in self.requests[1]["messages"] if m["role"] == "tool"}
         self.assertIn("已写入", outputs["write"])
-        self.assertEqual(outputs["shell"].splitlines(), ["[exit 0]", "auto-shell-ok"])
-        self.assertEqual(outputs["fetch"], "本地网页样本")
-        self.assertIn("权限拒绝", outputs["escape"])
+        self.assertEqual(tool_text(outputs["shell"]).splitlines(), ["[exit 0]", "auto-shell-ok"])
+        self.assertEqual(tool_text(outputs["fetch"]), "本地网页样本")
+        self.assertEqual(json.loads(outputs["escape"])["code"], "policy_denied")
         self.assertIn("危险模式", outputs["danger"])
         self.assertIn("FileNotFoundError", outputs["missing"])
         saved = self.store.load("default")
@@ -148,13 +146,13 @@ class AutoPermissionScenarios(OfflineScenario):
         self.assertIn("保留原文件", next(m["content"] for m in saved if m.get("tool_call_id") == "manual"))
         self.assertEqual(output.getvalue().count("[权限确认]"), 1)
         self.assertEqual(len(self.requests), 4)
-        self.assertEqual(len(self.check_requests), 2)
+        self.assertEqual(len(self.check_requests), 0)
         self.assertNotIn("/auto", json.dumps(saved, ensure_ascii=False))
         self.assertNotIn("旧任务标记", json.dumps(self.all_requests, ensure_ascii=False))
         backups = list(self.store.directory.glob("default-backup-*.json"))
         self.assertEqual(len(backups), 1)
         self.assertEqual(json.loads(backups[0].read_text(encoding="utf-8")), old)
-        self.assertEqual(self.agent.token_usage.totals, {"prompt_tokens": 212, "completion_tokens": 16, "total_tokens": 228})
+        self.assertEqual(self.agent.token_usage.totals, {"prompt_tokens": 200, "completion_tokens": 14, "total_tokens": 214})
 
 
 if __name__ == "__main__":

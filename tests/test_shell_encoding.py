@@ -1,5 +1,6 @@
 """真实本地子进程的编码回归测试；模型响应保持离线模拟。"""
 import os
+import json
 import shlex
 import subprocess
 import sys
@@ -39,8 +40,10 @@ class ShellEncodingScenarios(OfflineScenario):
                 with patch.object(threading, "excepthook", side_effect=lambda event: failures.append(event.exc_value)):
                     result = tools.run_shell(self.tools, output_command(stdout, stderr, code))
                 self.assertEqual(failures, [], "子进程读取线程不应再发生解码异常")
-                self.assertEqual(result, expected)
-                self.assertNotIn("None", result)
+                self.assertEqual(result.data, expected)
+                self.assertEqual(result.exit_code, code)
+                self.assertEqual(result.ok, code == 0)
+                self.assertNotIn("None", result.data)
 
     def test_decoded_output_passes_through_permission_execution_and_agent_reply(self):
         """真实运行命令后，退出码和两路中文输出须完整回传给模拟模型。"""
@@ -59,9 +62,12 @@ class ShellEncodingScenarios(OfflineScenario):
         self.assertEqual(result, "命令输出已接收")
         self.assertEqual(failures, [])
         self.assertEqual(asked, [("run_shell", {"command": command})])
-        self.assertEqual(self.requests[1]["messages"][-1], {
-            "role": "tool", "tool_call_id": "encoded",
-            "content": "[exit 7]\n正常输出 €\n错误信息\n"})
+        message = self.requests[1]["messages"][-1]
+        self.assertEqual(message["role"], "tool")
+        self.assertEqual(message["tool_call_id"], "encoded")
+        self.assertEqual(json.loads(message["content"]), {
+            "ok": False, "data": "[exit 7]\n正常输出 €\n错误信息\n",
+            "code": "execution_error", "message": "命令非零退出", "exit_code": 7})
         self.assertEqual(len(self.requests), 2)
 
 

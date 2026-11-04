@@ -52,6 +52,8 @@ def main(agent=None, store=None):
     agent = agent if agent is not None else create_agent()
     store = store if store is not None else SessionStore()
     agent.messages = store.load("default") or [{"role": "system", "content": SYSTEM}]
+    if agent.event_sink is None:
+        agent.event_sink = lambda event: store.append_event("default", event)
     print("自动执行默认关闭；/auto on 开启，/auto off 关闭，/auto 查看状态。")
     while True:
         q = input("你> ").strip()
@@ -64,7 +66,10 @@ def main(agent=None, store=None):
         if q == "/new":
             start_new_session(agent, store)
             continue
-        print("\n" + agent.run(q) + "\n")
-        store.save("default", agent.messages)
+        try:
+            result = agent.run(q)
+            print("\n" + result.text + "\n")
+        finally:
+            store.save("default", agent.messages)
 
 

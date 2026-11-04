@@ -6,7 +6,7 @@ import unittest
 import httpx
 from openai import InternalServerError
 
-from scenario_support import OfflineScenario, agent, context, permissions, answer, call, tool_reply
+from scenario_support import OfflineScenario, agent, context, permissions, answer, call, tool_reply, tool_text
 from test_context import history
 
 
@@ -27,7 +27,7 @@ class TokenUsageScenarios(OfflineScenario):
         with contextlib.redirect_stdout(output):
             self.agent.messages = messages
             result = self.agent.run("继续")
-        self.assertEqual(result, "完成")
+        self.assertEqual(result.text, "完成")
         self.assert_complete_tool_pairs(messages)
         text = output.getvalue()
         self.assertEqual(text.count("[摘要 tokens]"), 1)
@@ -36,7 +36,7 @@ class TokenUsageScenarios(OfflineScenario):
         self.assertIn("输入=220 输出=20 合计=240", text)
         self.assertIn("本次运行累计：输入=1420 输出=80 合计=1500", text)
         self.assertEqual(self.agent.last_prompt_tokens, 220)
-        self.assertEqual(self.requests[2]["messages"][-1]["content"], "ok")
+        self.assertEqual(tool_text(self.requests[2]["messages"][-1]["content"]), "ok")
         self.assertEqual(len(self.requests), 3)
 
     def test_missing_usage_and_failed_requests_are_not_invented_or_added_to_totals(self):
@@ -46,7 +46,7 @@ class TokenUsageScenarios(OfflineScenario):
         with contextlib.redirect_stdout(output):
             self.agent.messages = messages
             result = self.agent.run("你好")
-        self.assertEqual(result, "服务端没提供用量")
+        self.assertEqual(result.text, "服务端没提供用量")
         self.assertIn("未返回 usage，本次未计入累计", output.getvalue())
         self.assertNotIn("输入=0", output.getvalue())
 
@@ -62,7 +62,7 @@ class TokenUsageScenarios(OfflineScenario):
         with contextlib.redirect_stdout(output):
             self.agent.messages = messages
             result = self.agent.run("再问一次")
-        self.assertEqual(result, "实际返回了零用量")
+        self.assertEqual(result.text, "实际返回了零用量")
         self.assertIn("本次运行累计：输入=0 输出=0 合计=0", output.getvalue())
         self.assertEqual(len(self.requests), 3)
 

@@ -16,6 +16,21 @@ SUMMARY_PROMPT = """你是对话摘要器。把下面这段 Agent 的历史对�
 只输出摘要本身。"""
 
 
+def render_tool_result(result):
+    """只截断模型视图，保持结构合法；原始结果另存执行记录。"""
+    payload = result.to_dict()
+    if "data" in payload:
+        text = (payload["data"] if isinstance(payload["data"], str)
+                else json.dumps(payload["data"], ensure_ascii=False))
+        if len(text) > 4000:
+            original_chars = len(text)
+            if len(text) > 8000:
+                text = text[:8000] + f"\n...（已截断，共 {original_chars} 字符）"
+            payload["data"] = truncate_tool_result(text)
+            payload.update(truncated=True, original_chars=original_chars)
+    return json.dumps(payload, ensure_ascii=False)
+
+
 # ---------- 第 1 层：截断工具结果 ----------
 def truncate_tool_result(text, limit=MAX_TOOL_CHARS):
     if len(text) <= limit:
@@ -94,3 +109,9 @@ class SessionStore:
         if not path.exists():
             return None
         return json.loads(path.read_text(encoding="utf-8"))
+
+    def append_event(self, name, event):
+        """与可压缩上下文分开保存的追加式轨迹，不保存 SDK 客户端或认证头。"""
+        self.directory.mkdir(parents=True, exist_ok=True)
+        with (self.directory / f"{name}.trace.jsonl").open("a", encoding="utf-8") as stream:
+            stream.write(json.dumps(event, ensure_ascii=False) + "\n")

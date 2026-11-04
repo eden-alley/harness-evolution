@@ -46,7 +46,9 @@ class SandboxScenarios(OfflineScenario):
 
         with patch.object(subprocess, "Popen", side_effect=launch_process) as launch:
             result = tools.run_shell(self.tools, command)
-        self.assertEqual(result, "[exit 7]\n正常\n错误\n")
+        self.assertFalse(result.ok)
+        self.assertEqual(result.exit_code, 7)
+        self.assertEqual(result.data, "[exit 7]\n正常\n错误\n")
         self.assertEqual(launch.call_count, 1)
         argv = launch.call_args.args[0]
         self.assertIsInstance(argv, list, "不能在宿主 shell 中拼接沙箱命令")
@@ -78,8 +80,9 @@ class SandboxScenarios(OfflineScenario):
             with self.subTest(search_path=search_path), patch.dict(os.environ, {"PATH": search_path}), \
                     patch.object(subprocess, "Popen") as launch:
                 result = self.tools.execute("run_shell", {"command": "echo should-not-run"})
-                self.assertIn("Error:", result)
-                self.assertIn("codex.exe", result)
+                self.assertEqual(result.code, "execution_error")
+                self.assertIn("Error:", result.message)
+                self.assertIn("codex.exe", result.message)
                 launch.assert_not_called()
 
     def test_sandbox_startup_error_is_returned_without_host_retry(self):
@@ -87,7 +90,8 @@ class SandboxScenarios(OfflineScenario):
             with self.subTest(error=type(error).__name__), \
                     patch.object(subprocess, "Popen", side_effect=error) as launch:
                 result = self.tools.execute("run_shell", {"command": "echo should-not-run"})
-                self.assertIn("Error:", result)
+                self.assertEqual(result.code, "execution_error")
+                self.assertIn("Error:", result.message)
                 self.assertEqual(launch.call_count, 1)
 
     def test_timeout_and_interrupt_terminate_the_process_tree(self):
@@ -102,7 +106,7 @@ class SandboxScenarios(OfflineScenario):
                         with self.assertRaises(KeyboardInterrupt):
                             tools.run_shell(self.tools, "echo wait", timeout=0.1)
                     else:
-                        self.assertIn("[超时]", tools.run_shell(self.tools, "echo wait", timeout=0.1))
+                        self.assertIn("[超时]", tools.run_shell(self.tools, "echo wait", timeout=0.1).message)
                 self.assertEqual(launch.call_count, 1)
                 kill_argv = terminate.call_args.args[0]
                 self.assertEqual(Path(kill_argv[0]).name.lower(), "taskkill.exe")
@@ -127,7 +131,7 @@ class SandboxScenarios(OfflineScenario):
         self.assertEqual(asked, ["echo denied", "echo failed"])
         self.assertEqual(launch.call_count, 1)
         outputs = {m["tool_call_id"]: m["content"] for m in self.requests[1]["messages"] if m["role"] == "tool"}
-        self.assertIn("权限拒绝", outputs["denied"])
+        self.assertIn("user_denied", outputs["denied"])
         self.assertIn("offline sandbox failure", outputs["failed"])
 
 

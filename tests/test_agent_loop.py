@@ -4,6 +4,7 @@
 """
 import contextlib
 import io
+import json
 import os
 import shlex
 import subprocess
@@ -11,7 +12,7 @@ import sys
 import unittest
 from unittest.mock import patch
 
-from scenario_support import OfflineScenario, agent, permissions, tools, answer, call, tool_reply
+from scenario_support import OfflineScenario, agent, permissions, tools, answer, call, tool_reply, tool_text
 
 
 class AgentLoopScenarios(OfflineScenario):
@@ -41,7 +42,8 @@ class AgentLoopScenarios(OfflineScenario):
         self.assertEqual(result, "正常任务完成")
         self.assertEqual((self.workspace / "nested/good.py").read_text(encoding="utf-8"), 'print("offline-ok")\n')
         self.assertEqual((self.workspace / "long.txt").stat().st_size, 8101)
-        outputs = {m["tool_call_id"]: m["content"] for m in self.requests[1]["messages"] if m["role"] == "tool"}
+        raw_outputs = {m["tool_call_id"]: m["content"] for m in self.requests[1]["messages"] if m["role"] == "tool"}
+        outputs = {key: tool_text(value) for key, value in raw_outputs.items()}
         self.assertEqual(outputs["list"], "(空目录)")
         self.assertEqual(outputs["read"], 'print("offline-ok")\n')
         self.assertTrue(outputs["read-long"].startswith("x" * 2000 + "\n...[中间省略"))
@@ -56,7 +58,7 @@ class AgentLoopScenarios(OfflineScenario):
         result, _ = self.run_agent("继续上一个任务", permissions.PermissionManager(workspace=self.tools.workspace, ), messages)
         self.assertEqual(result, "还能看到上次的文件内容")
         self.assertIn({"role": "user", "content": "创建、读取、运行并抓网页"}, self.requests[2]["messages"])
-        self.assertIn({"role": "tool", "tool_call_id": "shell", "content": outputs["shell"]}, self.requests[2]["messages"])
+        self.assertIn({"role": "tool", "tool_call_id": "shell", "content": raw_outputs["shell"]}, self.requests[2]["messages"])
         self.assertEqual(len(self.requests), 3)
 
     def test_errors_and_denials_are_returned_without_side_effects_or_aborting_batch(self):
@@ -87,14 +89,19 @@ class AgentLoopScenarios(OfflineScenario):
                               "danger": "危险模式", "timeout": "[超时]"}.items():
             with self.subTest(call_id=call_id):
                 self.assertIn(text, outputs[call_id])
-        self.assertEqual(outputs["last"], "后续工具仍执行")
+        self.assertEqual(tool_text(outputs["last"]), "后续工具仍执行")
         self.assertEqual(sorted(p.name for p in self.workspace.iterdir()), ["seed.txt"])
         self.assertFalse((self.workspace.parent / "outside.txt").exists())
-        self.assertEqual([name for name, _ in asked], ["write_file", "not_a_tool", "write_file", "run_shell"])
+        self.assertEqual([name for name, _ in asked], ["write_file", "run_shell"])
+        for call_id, code in {"json": "invalid_arguments", "bad-args": "invalid_arguments",
+                              "unknown": "tool_unavailable", "denied": "user_denied",
+                              "outside": "policy_denied", "danger": "policy_denied",
+                              "missing": "execution_error", "timeout": "execution_error"}.items():
+            self.assertEqual(json.loads(outputs[call_id])["code"], code)
         for name, args in [("read_file", {"path": "../outside.txt"}),
                            ("list_dir", {"path": ".."}),
                            ("write_file", {"path": "../outside.txt", "content": "no"})]:
-            self.assertIn("工作区之外", self.tools.execute(name, args))
+            self.assertIn("工作区之外", self.tools.execute(name, args).message)
         self.assertEqual(len(self.requests), 2)
 
     def test_loop_stops_on_final_answer_empty_answer_and_step_limit(self):
@@ -116,7 +123,9 @@ class AgentLoopScenarios(OfflineScenario):
         outputs = [m for m in messages if m["role"] == "tool"]
         self.assertEqual([m["tool_call_id"] for m in outputs], ["read-0", "read-1", "read-2"])
         self.assertTrue(all("FileNotFoundError" in m["content"] for m in outputs))
-        self.assertEqual(messages[-1]["role"], "tool")
+        self.assertEqual(messages[-2]["role"], "tool")
+        self.assertEqual(messages[-1], {"role": "assistant", "content": result})
+        self.assertEqual(self.last_result.stop_reason, "max_steps")
 
     def test_terminal_confirmation_refusal_remembering_and_noninteractive_denial(self):
         """抓住终端不展示真实参数、拒绝原因丢失、记忆权限越界或非交互放行。"""
@@ -141,6 +150,7 @@ class AgentLoopScenarios(OfflineScenario):
             denied = fresh.check("write_file", {"path": "pipe.txt", "content": "x"})
         self.assertFalse(denied.allowed)
         self.assertIn("非交互环境", denied.reason)
+        self.assertEqual(denied.code, "confirmation_unavailable")
         self.assertEqual(list(self.workspace.iterdir()), [])
 
 

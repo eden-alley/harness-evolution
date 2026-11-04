@@ -24,6 +24,7 @@ import context
 import permissions
 import tools
 import token_usage
+from verification import VERIFICATION_SYSTEM
 
 
 def call(call_id, name, args):
@@ -38,6 +39,12 @@ def tool_reply(*calls):
 
 def answer(text):
     return {"role": "assistant", "content": text}
+
+
+def tool_text(content):
+    """旧场景仍断言实际输出；结构与错误码另有专门的契约断言。"""
+    payload = json.loads(content)
+    return payload.get("data", payload.get("message", ""))
 
 
 class OfflineScenario(unittest.TestCase):
@@ -84,14 +91,14 @@ class OfflineScenario(unittest.TestCase):
             payload = json.loads(request.content)
             self.assert_complete_tool_pairs(payload["messages"])
             self.all_requests.append(payload)
-            is_check = payload["messages"][0]["content"] == getattr(agent, "EXIT_CHECK_SYSTEM", None)
-            # 旧场景继续单独查看执行/摘要请求；检查请求及全部请求另行保留。
+            is_check = payload["messages"][0]["content"] == VERIFICATION_SYSTEM
             (self.check_requests if is_check else self.requests).append(payload)
             try:
                 if is_check:
-                    # 旧场景默认检查通过；专门的退出测试显式提供每次检查响应。
-                    message = next(checks) if checks is not None else answer(json.dumps({
-                        "decision": "completed", "reason": "离线场景的完成条件已满足"}))
+                    # 不提供兜底通过：未显式配置的额外模型验收属于错误请求。
+                    if checks is None:
+                        raise AssertionError("未配置模型验收响应")
+                    message = next(checks)
                 else:
                     message = next(replies)
             except StopIteration:
@@ -117,15 +124,16 @@ class OfflineScenario(unittest.TestCase):
         self.addCleanup(client.close)
         self.replace(self.agent, "client", client)
 
-    def run_agent(self, task, perms, messages=None):
+    def run_agent(self, task, perms, messages=None, *, verifier=None):
         if messages is None:
             messages = [{"role": "system", "content": agent.SYSTEM}]
         with contextlib.redirect_stdout(io.StringIO()):
             self.agent.messages = messages
             self.agent.permissions = perms
-            result = self.agent.run(task)
+            result = self.agent.run(task, verifier=verifier)
+        self.last_result = result
         self.assert_complete_tool_pairs(messages)
-        return result, messages
+        return result.text, messages
 
 
 

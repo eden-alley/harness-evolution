@@ -57,6 +57,7 @@ SHELL_DENY_PATTERNS = [
 class Decision:
     allowed: bool
     reason: str = ""
+    code: str = ""
 
 
 def render_call(name: str, args: dict, max_chars: int = 400) -> str:
@@ -93,12 +94,12 @@ class PermissionManager:
         # 第 1 关：硬规则，人也无法放行
         reason = self._hard_limits(name, args)
         if reason:
-            return Decision(False, reason)
+            return Decision(False, reason, "policy_denied")
 
         # 第 2 关：风险分级
         risk = TOOL_RISK.get(name, Risk.CONFIRM)
         if risk is Risk.DENY:
-            return Decision(False, f"工具 {name} 被策略禁用。")
+            return Decision(False, f"工具 {name} 被策略禁用。", "policy_denied")
         if risk is Risk.SAFE or name in self.always_allowed:
             return Decision(True)
         if self.auto_approve and name in TOOL_RISK:
@@ -122,7 +123,10 @@ class PermissionManager:
 
     # ---------- 第 3 关 ----------
     def _confirm(self, name: str, args: dict) -> Decision:
-        answer, note = self.ask(name, args)
+        response = self.ask(name, args)
+        if isinstance(response, Decision):
+            return response
+        answer, note = response
         if answer == "a" and name in REMEMBERABLE:
             self.always_allowed.add(name)
             return Decision(True)
@@ -132,13 +136,13 @@ class PermissionManager:
         if note:
             msg += f"原因：{note}。"
         msg += "不要重试同一操作；请换一种方式，或向用户说明你想做什么、为什么。"
-        return Decision(False, msg)
+        return Decision(False, msg, "user_denied")
 
     @staticmethod
     def _ask_terminal(name: str, args: dict):
         if not sys.stdin.isatty():
             # 非交互环境（管道、脚本）没有人可以确认，默认拒绝
-            return "n", "当前是非交互环境，无法确认"
+            return Decision(False, "当前是非交互环境，无法确认", "confirmation_unavailable")
         print(f"\n[权限确认] Agent 想执行：{name}")
         print(render_call(name, args))
         options = "[y]允许 / [n]拒绝" + (" / [a]本次会话一直允许" if name in REMEMBERABLE else "")
