@@ -11,3 +11,14 @@ __pycache__/
 !.env.example
 .vscode/
 .idea/
+
+# Local Agent state, command scripts and exercises
+.nami-agent/
+*.trace.jsonl
+.agent-command-*.cmd
+.sandbox-test-*/
+native-sandbox-check-*/
+playground/
+expense-demo/
+langchain-report/
+v2-refactor/
