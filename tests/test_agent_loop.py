@@ -37,7 +37,8 @@ class AgentLoopScenarios(OfflineScenario):
                 call("fetch", "fetch_url", {"url": "https://offline.invalid/page"})),
             answer("正常任务完成"), answer("还能看到上次的文件内容"),
         ])
-        with patch.object(tools.urllib.request, "urlopen", return_value=io.BytesIO("网页样本".encode())):
+        with patch.object(tools.urllib.request, "build_opener") as opener:
+            opener.return_value.open.return_value = io.BytesIO("网页样本".encode())
             result, messages = self.run_agent("创建、读取、运行并抓网页", permissions.PermissionManager(workspace=self.tools.workspace, ask=ask))
         self.assertEqual(result, "正常任务完成")
         self.assertEqual((self.workspace / "nested/good.py").read_text(encoding="utf-8"), 'print("offline-ok")\n')

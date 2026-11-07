@@ -126,9 +126,10 @@ class AutoPermissionScenarios(OfflineScenario):
 
         with patch("builtins.input", side_effect=terminal_input), \
                 patch.object(sys.stdin, "isatty", return_value=True), \
-                patch.object(tools.urllib.request, "urlopen", return_value=io.BytesIO("本地网页样本".encode())), \
+                patch.object(tools.urllib.request, "build_opener") as opener, \
                 patch.object(self.tools, "run_command", wraps=self.tools.run_command) as sandbox_run, \
                 contextlib.redirect_stdout(output):
+            opener.return_value.open.return_value = io.BytesIO("本地网页样本".encode())
             self.run_cli()
 
         self.assertEqual((self.workspace / "note.txt").read_text(encoding="utf-8"), "自动写入")

@@ -53,7 +53,7 @@ class TokenUsageScenarios(OfflineScenario):
         self.model([httpx.Response(503, json={"error": {"message": "offline failure"}})])
         output = io.StringIO()
         with contextlib.redirect_stdout(output), self.assertRaises(InternalServerError):
-            context.compact(self.agent.client, self.agent.model, history(3), self.agent.token_usage.record)
+            context.compact(self.agent.model_adapter, history(3), self.agent.token_usage.record)
         self.assertEqual(output.getvalue(), "")
 
         self.model([(answer("实际返回了零用量"),

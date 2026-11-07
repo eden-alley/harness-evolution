@@ -63,7 +63,7 @@ class ContextScenarios(OfflineScenario):
         self.assert_complete_tool_pairs([original[0]] + recent)
         self.assertIsNone(context.split_for_compact(history(2)))
         short = history(1)
-        self.assertIs(context.compact(object(), "unused", short, self.agent.token_usage.record), short)
+        self.assertIs(context.compact(object(), short, self.agent.token_usage.record), short)
 
     def test_soft_limit_uses_reported_usage_and_cleans_only_old_tool_contents(self):
         """抓住阈值边界错误、未记录 usage、入历史前未截断或清理损坏工具配对。"""
@@ -134,7 +134,7 @@ class ContextScenarios(OfflineScenario):
         intact = history(4)
         snapshot = deepcopy(intact)
         with self.assertRaises(InternalServerError):
-            context.compact(self.agent.client, self.agent.model, intact, self.agent.token_usage.record)
+            context.compact(self.agent.model_adapter, intact, self.agent.token_usage.record)
         self.assertEqual(intact, snapshot)
         self.assertEqual(len(self.requests), 1)
 

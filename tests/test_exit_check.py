@@ -19,7 +19,7 @@ def verdict(status, reason, evidence=None):
 
 class ExitCheckScenarios(OfflineScenario):
     def model_verifier(self, criteria="内容必须来自实际读取的文件"):
-        return ModelVerifier(self.agent.client, self.agent.model, criteria,
+        return ModelVerifier(self.agent.model_adapter, criteria,
                              self.agent.token_usage.record)
 
     def test_optional_model_verifier_uses_task_evidence_and_counts_usage_once(self):
@@ -202,8 +202,8 @@ class ExitCheckScenarios(OfflineScenario):
         self.assertEqual(self.last_result.verification.status, "pass")
         self.assertEqual(asked, [("run_shell", {"command": "check"})] * 2)
         self.assertEqual(runs, [("check", self.workspace, 30)] * 2)
-        self.assertEqual([e["exit_code"] for e in self.agent._tool_results], [1, 0])
-        self.assertTrue(all(e["source"] == "verification" for e in self.agent._tool_results))
+        self.assertEqual([e["exit_code"] for e in self.agent.run_state.tool_results], [1, 0])
+        self.assertTrue(all(e["source"] == "verification" for e in self.agent.run_state.tool_results))
         # 拒绝确认、无终端、硬规则和启动失败都不能伪装成测试不通过并反复退回。
         for decision, expected in [
             (permissions.Decision(False, "用户拒绝", "user_denied"), "needs_input"),

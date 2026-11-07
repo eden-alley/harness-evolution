@@ -2,6 +2,7 @@
 import json
 import os
 from pathlib import Path
+import tempfile
 
 MAX_TOOL_CHARS = 4000          # 单个工具结果最多保留的字符数
 KEEP_RECENT_TOOL_RESULTS = 3   # 清理时，保留最近几条工具结果
@@ -72,18 +73,18 @@ def render_for_summary(msgs):
     return "\n".join(lines)
 
 
-def compact(client, model, messages, record_usage):
+def compact(model, messages, record_usage, *, before_query=None):
     parts = split_for_compact(messages)
     if parts is None:
         return messages
     old, recent = parts
-    resp = client.chat.completions.create(model=model, messages=[
+    if before_query is not None:
+        before_query()
+    resp = model.query([
         {"role": "system", "content": SUMMARY_PROMPT},
-        {"role": "user", "content": render_for_summary(old)}],
-        # 本机模型适配：摘要请求同样关闭默认思考模式。
-        extra_body={"thinking": {"type": "disabled"}})
+        {"role": "user", "content": render_for_summary(old)}])
     record_usage(resp.usage, "摘要")
-    summary = resp.choices[0].message.content
+    summary = resp.require_message().get('content')
     return [messages[0],
             {"role": "user", "content": f"[以下是此前对话的摘要]\n{summary}"},
             {"role": "assistant", "content": "好的，我已了解之前的进展，继续。"},
@@ -91,6 +92,25 @@ def compact(client, model, messages, record_usage):
 
 
 # ---------- 会话持久化 ----------
+def atomic_write_json(path, payload):
+    """同目录临时文件刷盘后替换；写失败保留上一份完整 JSON。"""
+    path = Path(path)
+    text = json.dumps(payload, ensure_ascii=False, indent=2, allow_nan=False)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(mode='w', encoding='utf-8', dir=path.parent,
+                                         prefix=f'.{path.name}.', suffix='.tmp', delete=False) as stream:
+            temporary = Path(stream.name)
+            stream.write(text)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+
+
 class SessionStore:
     """会话保存位置由实例管理，继续使用原有 JSON 消息列表格式。"""
     def __init__(self, directory=None):
@@ -100,9 +120,7 @@ class SessionStore:
         self.directory = Path(directory)
 
     def save(self, name, messages):
-        self.directory.mkdir(parents=True, exist_ok=True)
-        (self.directory / f"{name}.json").write_text(
-            json.dumps(messages, ensure_ascii=False, indent=2), encoding="utf-8")
+        atomic_write_json(self.directory / f'{name}.json', messages)
 
     def load(self, name):
         path = self.directory / f"{name}.json"
@@ -113,5 +131,10 @@ class SessionStore:
     def append_event(self, name, event):
         """与可压缩上下文分开保存的追加式轨迹，不保存 SDK 客户端或认证头。"""
         self.directory.mkdir(parents=True, exist_ok=True)
-        with (self.directory / f"{name}.trace.jsonl").open("a", encoding="utf-8") as stream:
-            stream.write(json.dumps(event, ensure_ascii=False) + "\n")
+        encoded = (json.dumps(event, ensure_ascii=False) + '\n').encode('utf-8')
+        with (self.directory / f'{name}.trace.jsonl').open('a+b') as stream:
+            if stream.tell():
+                stream.seek(-1, os.SEEK_END)
+                if stream.read(1) != b'\n':
+                    stream.write(b'\n')  # 保留硬退出断尾，并给后续事件独立行界。
+            stream.write(encoded)

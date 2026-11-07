@@ -1,0 +1,8 @@
+test_real_direct_network_connection_to_local_listener_is_blocked (test_sandbox_native.NativeSandboxScenarios.test_real_direct_network_connection_to_local_listener_is_blocked) ... ok
+test_real_timeout_stops_child_process_before_followup_file_write (test_sandbox_native.NativeSandboxScenarios.test_real_timeout_stops_child_process_before_followup_file_write) ... ok
+test_real_write_boundary_read_scope_and_environment (test_sandbox_native.NativeSandboxScenarios.test_real_write_boundary_read_scope_and_environment) ... ok
+
+----------------------------------------------------------------------
+Ran 3 tests in 12.260s
+
+OK

@@ -40,10 +40,9 @@ class VerificationInput:
 
 class ModelVerifier:
     """显式选用时才调用模型；输入只包含本任务证据，不包含整段历史。"""
-    def __init__(self, client, model, criteria, record_usage):
+    def __init__(self, model, criteria, record_usage):
         if not isinstance(criteria, str) or not criteria.strip():
             raise ValueError("需要明确的验收条件")
-        self.client = client
         self.model = model
         self.criteria = criteria
         self.record_usage = record_usage
@@ -52,17 +51,14 @@ class ModelVerifier:
         payload = {"task": context.task, "criteria": self.criteria,
                    "candidate": context.candidate, "tool_results": context.tool_results,
                    "available_tools": context.available_tools}
-        response = self.client.chat.completions.create(
-            model=self.model,
-            messages=[{"role": "system", "content": VERIFICATION_SYSTEM},
-                      {"role": "user", "content": json.dumps(payload, ensure_ascii=False)}],
-            extra_body={"thinking": {"type": "disabled"}},
-        )
+        response = self.model.query([
+            {"role": "system", "content": VERIFICATION_SYSTEM},
+            {"role": "user", "content": json.dumps(payload, ensure_ascii=False)}])
         self.record_usage(response.usage, "验收")
-        message = response.choices[0].message
-        if message.tool_calls:
+        message = response.require_message()
+        if message.get('tool_calls'):
             raise ValueError("模型验收器不允许调用工具")
-        result = json.loads(message.content or "")
+        result = json.loads(message.get('content') or "")
         if not isinstance(result, dict):
             raise ValueError("验收输出必须是 JSON 对象")
         return CheckResult(**result)

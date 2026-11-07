@@ -4,10 +4,12 @@ from __future__ import annotations
 import os
 import re
 import sys
+from copy import deepcopy
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 from textwrap import indent
+from urllib.parse import urlsplit
 
 
 class Workspace:
@@ -60,6 +62,18 @@ class Decision:
     code: str = ""
 
 
+def fetch_url_denial(url):
+    """只限制 URL 协议和基本格式；不改变宿主的公网、内网和代理可达范围。"""
+    try:
+        parsed = urlsplit(url)
+        if parsed.scheme.lower() not in ("http", "https") or not parsed.hostname:
+            return "网页工具仅允许具有主机名的 HTTP/HTTPS URL。"
+        parsed.port  # 由标准解析器拒绝非法端口格式。
+    except (TypeError, ValueError):
+        return "网页 URL 格式不合法。"
+    return None
+
+
 def render_call(name: str, args: dict, max_chars: int = 400) -> str:
     """确认界面：展示将要执行的真实内容，而不是模型的自述。"""
     if name == "run_shell":
@@ -110,6 +124,8 @@ class PermissionManager:
 
     # ---------- 第 1 关 ----------
     def _hard_limits(self, name: str, args: dict) -> str | None:
+        if name == "fetch_url":
+            return fetch_url_denial(args.get("url", ""))
         if name in ("read_file", "write_file", "list_dir"):
             path = args.get("path", ".")
             if self.workspace.resolve(path) is None:
@@ -123,7 +139,10 @@ class PermissionManager:
 
     # ---------- 第 3 关 ----------
     def _confirm(self, name: str, args: dict) -> Decision:
-        response = self.ask(name, args)
+        approval_args = deepcopy(args)
+        response = self.ask(name, approval_args)
+        if approval_args != args:
+            return Decision(False, "权限确认组件修改了工具参数，未执行操作且未保存授权。", "execution_error")
         if isinstance(response, Decision):
             return response
         answer, note = response

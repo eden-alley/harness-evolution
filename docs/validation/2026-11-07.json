@@ -1,0 +1,78 @@
+{
+  "schema_version": 1,
+  "recorded_at_utc": "2026-11-07T04:54:07.264444+00:00",
+  "scope": "Offline program-behavior regression of this source snapshot; not a live-model benchmark.",
+  "environment": {
+    "os": "Windows",
+    "os_release": "11",
+    "python": "3.14.6"
+  },
+  "checks": [
+    {
+      "name": "basic",
+      "command": "python -B -X utf8 tests/run_offline.py",
+      "tests": 111,
+      "exit_code": 0,
+      "log": "docs/validation/2026-11-07-basic.txt",
+      "log_sha256": "de76c2aa0a033b8dcb67641cc62494e1ada2129cba5a34fbf743075c673304a2"
+    },
+    {
+      "name": "native",
+      "command": "python -B -X utf8 tests/run_offline.py --native",
+      "tests": 3,
+      "exit_code": 0,
+      "log": "docs/validation/2026-11-07-native.txt",
+      "log_sha256": "dbe5261893aaba19f8747c68ba641baafb255660ddc0b98769c045155b7f5209"
+    }
+  ],
+  "real_model_requests": 0,
+  "fixtures": "Local MockTransport responses, sample files, injected faults and actual native sandbox.",
+  "log_redaction": "Machine home and staging directory paths replaced; test outcomes unchanged.",
+  "source_sha256": {
+    "agent.py": "ae2e58e1291a2ece12cfb06d6c8ae424927d271d4ff347f2faf7dc3855595464",
+    "checkpoint.py": "17f115061c7e62f5c230e58066424195e839a34f88c39a4aa995c7939538f2ac",
+    "cli.py": "c632e8a650d4aa75fed1cff977268b06656641674ed542f9e337a37c271caeee",
+    "context.py": "ae0dfb679842acbf9c9639dec3e3aa60c5842d98b83ca548934086991889e4f9",
+    "limits.py": "99c44642b4d1b31ae956bf5065e90f0ef9c936e060cae97b2999eac57602549e",
+    "model_base.py": "f85a3caff31f92c1be90b76b1f83dd70cfc7488c0e1389f2c3e377ac02af8291",
+    "model_deepseek.py": "65a62aa554cf06fddbbb760072101e97e649e656ac0456551be2b37b5a673b32",
+    "model_openai.py": "8b5ff03cb832f6b449dae1fadc63b61031ffa617e43e4c95bd46178b343fbbd6",
+    "models.py": "c5b35da4892f067391b11b0484b279b98a7ea363acc792bdfe7124212736c3e7",
+    "permissions.py": "019e52b82c6981cd49c76bf8a28509b841a89856e50e7515a29a05204e3a1e5b",
+    "prompts.py": "6403e306fb805e5e6a87518ddf524f5e7f8ea5f13f8057307d3b04e5fdb5b18b",
+    "requirements.txt": "47ac7bd93af3aefb771ff4b902ce099a1ba93f5a64e907eb6e57fc169c6bdf5e",
+    "sandbox.py": "e699f6da67d0443cea41fec778542ab0443406c24b6c4515be7f2a7d98ce0e51",
+    "state.py": "fb714e9cf9061c41ff0f76be1a6987b28789ef565a6cbc6792fb67283af96531",
+    "tests/checkpoint_child.py": "698d564678df19aa26402c41286fcddcf33c3e031217161d281bb3a5a713507d",
+    "tests/conftest.py": "0c015be1df639ac75cffe507747919060ea4798bf9cb08faf1fcc38de97940db",
+    "tests/run_offline.py": "b8b8d626c26df2ebfcd7cbcc7e2936781729862f1b3df2837c682dfad1ec004a",
+    "tests/scenario_support.py": "81afd4b4cf34a862d78e95f5839e06bec2cdcb69663d08d1f23a7ba4be3ce577",
+    "tests/test_agent_loop.py": "9c84ae37eef5dd9a9df3b14a85e7083ababc8e52812461fa83ddd588ed182f8a",
+    "tests/test_auto_permissions.py": "ad9ea8df48d0ac379d0e2a7b25303f60701e352e67946b80bd398796a4b800a1",
+    "tests/test_checkpoints.py": "6c4952edd7a7355bca501885721c6ccb82dc425e72f17dceb917d9813e33532e",
+    "tests/test_context.py": "43392631e771e8cfff5f1a049c26075aa5ccd6d075b9f4e95fa45c5d47051b8f",
+    "tests/test_exit_check.py": "d759aeaeb827399c6cf4f46b0c22df3184a3f3e6206ae28a810f3e0feed8767e",
+    "tests/test_fetch_url.py": "905918f42ad716d517272b49c20fff7360d0ca311fdff49a7813570da0809ead",
+    "tests/test_limits.py": "a070aca37d54bf59959f7ed4f071b854222a21263a08c722461b3057b39289a1",
+    "tests/test_models.py": "62e32774ef957ddd45fa5caed14686985bb1fd27992ea486993aa137e4f9f061",
+    "tests/test_new_session.py": "b807183b543a0f01fc1437647e737c8ce8687496d8b67296ff525bd6698fa749",
+    "tests/test_permissions.py": "3c482ab597a220f50f200648a5590a568469baecc6cb796ba23ca6792960c0a8",
+    "tests/test_run_state.py": "18d9a44b084c71c2a02a8e5e17d3af6428a0730f0a161affca4ff8ec519d6ab3",
+    "tests/test_sandbox.py": "6d117dea84bfe7b8a83b7f44f06ace77ceb2d94483c85c2d04addc510f8b16d5",
+    "tests/test_sandbox_native.py": "9fbb41d0635c1b01879882521f331362885b0383681644e2ca454954e1caaf15",
+    "tests/test_shell_encoding.py": "c03f5d6dadb43067f06d943f18a5e5304a7cd34ca3acf2263b41e64336a8e077",
+    "tests/test_structure.py": "fe3175e81181495aae1ca6582d26b4bae2cdbb3cb1de7ec14beb65667f1c144a",
+    "tests/test_task_verification.py": "bf0654963132eab429e95ecc0f01f4de6c40457510c447a5c6696735aeeab34c",
+    "tests/test_token_usage.py": "560862306290bbcb5780ac10a575ebb4daa60f8b70ebded297572b71f55310ee",
+    "tests/test_tool_contracts.py": "f551b979ec87f73055381c3afd55f99d879b7e213e8fcbd21cd2808d74a68d11",
+    "tests/test_trace_and_failures.py": "24e8f93454ed2d835d3a2de4ce9b0e23ab165d0ea6b70a83a99a4cc8ac3a083e",
+    "token_usage.py": "226e2b67a83a015a6dd92e30f071fe6264eb79fab5249e16b08e0b6f84151bb9",
+    "tools.py": "b45adf1571fcfd5ebe8b603ea1e1e732d3dabbb93b9670f4b94c066ce88c622b",
+    "verification.py": "4ec18add9d3a242a018a84fb9072c41d9e7b8e90ee273bde6b8fac40099dbbb3"
+  },
+  "not_verified": [
+    "Live model task success rate",
+    "Other machines or sandbox configurations",
+    "BFCL benchmark scores"
+  ]
+}
