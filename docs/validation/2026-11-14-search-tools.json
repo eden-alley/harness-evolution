@@ -1,0 +1,161 @@
+{
+  "status": "complete_with_existing_native_failures",
+  "harness_version": "0.35",
+  "source_sha256": "efdcab908e4f3005212332970880d2cc33ae44d5e73d126ca5912bd18a133ae0",
+  "scope": "第二批R1-R6：仅find_files/search_text及注册、只读权限、rg缺失提示与测试",
+  "real_model_requests": 0,
+  "runtime_restarted": false,
+  "baseline_version": "0.34",
+  "baseline_source_sha256": "9c8c999cb38d699281945a77c66a12207fc5bdd5e5c09aaf70a3f36602063b5e",
+  "baseline_backup": "C:\\Users\\叶宸玮\\Documents\\Codex\\2026-11-06\\new-chat-5\\outputs\\harness-v0.35-search-tools-20261114\\before",
+  "evidence_directory": "C:\\Users\\叶宸玮\\Documents\\Codex\\2026-11-06\\new-chat-5\\outputs\\harness-v0.35-search-tools-20261114",
+  "search_dependency": {
+    "path": "C:\\Users\\叶宸玮\\AppData\\Local\\Microsoft\\WinGet\\Packages\\BurntSushi.ripgrep.MSVC_Microsoft.Winget.Source_8wekyb3d8bbwe\\ripgrep-15.2.0-x86_64-pc-windows-msvc\\rg.exe",
+    "version": "ripgrep 15.2.0 (rev e89fff89ac)",
+    "installed_or_upgraded": false
+  },
+  "baseline_basic": {
+    "tests": 184,
+    "passed": 184,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0,
+    "seconds": 10.712,
+    "failure_ids": [],
+    "log": "C:\\Users\\叶宸玮\\Documents\\Codex\\2026-11-06\\new-chat-5\\outputs\\harness-v0.35-search-tools-20261114\\baseline-basic.log"
+  },
+  "new_offline_test_methods": 24,
+  "final_basic": {
+    "tests": 208,
+    "passed": 208,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0,
+    "seconds": 18.012,
+    "failure_ids": [],
+    "log": "C:\\Users\\叶宸玮\\Documents\\Codex\\2026-11-06\\new-chat-5\\outputs\\harness-v0.35-search-tools-20261114\\final-basic.log"
+  },
+  "final_mcp_stdio": {
+    "tests": 4,
+    "passed": 4,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0,
+    "seconds": 6.039,
+    "failure_ids": [],
+    "log": "C:\\Users\\叶宸玮\\Documents\\Codex\\2026-11-06\\new-chat-5\\outputs\\harness-v0.35-search-tools-20261114\\final-mcp-stdio.log"
+  },
+  "final_mcp_http": {
+    "tests": 1,
+    "passed": 1,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0,
+    "seconds": 0.846,
+    "failure_ids": [],
+    "log": "C:\\Users\\叶宸玮\\Documents\\Codex\\2026-11-06\\new-chat-5\\outputs\\harness-v0.35-search-tools-20261114\\final-mcp-http.log"
+  },
+  "final_native": {
+    "tests": 6,
+    "passed": 4,
+    "failed": 2,
+    "errors": 0,
+    "skipped": 0,
+    "seconds": 14.77,
+    "failure_ids": [
+      "test_real_bash_pipeline_with_rg (test_sandbox_native.NativeSandboxScenarios.test_real_bash_pipeline_with_rg)",
+      "test_real_registry_credential_canary_is_not_readable (test_sandbox_native.NativeSandboxScenarios.test_real_registry_credential_canary_is_not_readable)"
+    ],
+    "log": "C:\\Users\\叶宸玮\\Documents\\Codex\\2026-11-06\\new-chat-5\\outputs\\harness-v0.35-search-tools-20261114\\final-native.log"
+  },
+  "limits": {
+    "find_default": 200,
+    "find_max": 2000,
+    "search_default_matching_lines": 100,
+    "search_max_matching_lines": 1000,
+    "context_lines": [
+      0,
+      5
+    ],
+    "seconds_per_call": 30,
+    "result_body_bytes": 65536,
+    "stable_sort": "path then logical line"
+  },
+  "coverage": [
+    "真实rg基础glob/ignore/隐藏文件/工作区相对路径/显式文件",
+    "中文字面量/正则/大小写/特殊字符与BOM-CRLF-LF-CR行号",
+    "二进制N+1、零宽EOF、空范围非法正则",
+    "越界/Windows目录联接/硬链接/.git大小写",
+    "候选失效不扩大搜索、超时停止线程进程、结果及错误容量",
+    "rg缺失隐藏和执行拒绝一致、程序路径固定、禁用用户rg配置",
+    "SDK本地响应查找-搜索-读取-编辑、权限历史token轮数退出",
+    "预览回查和根目录源码快照独立加载"
+  ],
+  "integrity": {
+    "unchanged_runtime_modules": [
+      "agent.py",
+      "checkpoint.py",
+      "context.py",
+      "execution_backend.py",
+      "file_edits.py",
+      "limits.py",
+      "mcp_adapter.py",
+      "mcp_notes_server.py",
+      "models.py",
+      "model_base.py",
+      "model_deepseek.py",
+      "model_openai.py",
+      "prompts.py",
+      "sandbox.py",
+      "state.py",
+      "token_usage.py",
+      "verification.py"
+    ],
+    "bfcl_and_old_v0_files": 24,
+    "frozen_fixture_files": 1,
+    "historical_version_entries_unchanged": 7,
+    "registered_source_files": 21
+  },
+  "review": {
+    "kind": "fresh read-only review",
+    "model": "gpt-6.1-sol",
+    "reasoning_effort": "high",
+    "must_fix_count": 3,
+    "fixed": [
+      "binary N+1 false-completeness: NUL prescan and unchanged-file verification",
+      "zero-width CRLF/EOF: native CRLF mode and match-event fallback",
+      "Windows .GIT casing: case-equivalent exclusion"
+    ],
+    "minor_fixed": [
+      "explicit files now honor same ignore rules"
+    ],
+    "verification": "4 new methods RED then GREEN; full basic 208/208",
+    "retained_boundaries": [
+      "no guarantee against hostile concurrent filesystem replacement",
+      "regex anchors use rg LF/CRLF semantics; returned line numbers support CR",
+      "no loop/context/backend/credential/Bash changes"
+    ]
+  },
+  "changed_files": [
+    "README.md",
+    "VERSION.json",
+    "cli.py",
+    "docs/third-party/pi-MIT.txt",
+    "docs/validation/2026-11-14-search-tools.json",
+    "file_search.py",
+    "permissions.py",
+    "tests/test_agent_loop.py",
+    "tests/test_file_search.py",
+    "tests/test_search_tool_loop.py",
+    "tests/test_task_progress.py",
+    "tools.py"
+  ],
+  "implementation_rulings": [
+    "glob filtering after ignored candidate enumeration",
+    "CLI only adds missing-rg status, credential loading unchanged",
+    "block NUL prescan adds sequential I/O within the same deadline, no file-size filter",
+    "BOM correction and logical-line mapping leave read_file unchanged",
+    "raw collection and display preview distinct; recall only restores returned content"
+  ],
+  "capability_claim": "离线验证工具与衔接；未进行真实模型任务对照，不宣称调查轮次或任务通过率改善。"
+}

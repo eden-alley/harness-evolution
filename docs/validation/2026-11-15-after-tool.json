@@ -1,0 +1,237 @@
+{
+  "status": "complete_with_existing_native_failures",
+  "harness_version": "0.40",
+  "theme": "after_tool observation callback",
+  "source_sha256": "d3174759da7da3a921eaefec7624e8012a0d49371372519def4f93d49585283e",
+  "baseline_version": "0.39",
+  "baseline_source_sha256": "a2e8d93bb0b9c2431b0fb6ce4d2e3d40f7a6e9de6920ec3fd9c06308a9877f52",
+  "baseline_backup": "C:\\Users\\叶宸玮\\Documents\\Codex\\2026-11-06\\new-chat-5\\outputs\\harness-v0.40-after-tool-20261115\\before",
+  "evidence_directory": "C:\\Users\\叶宸玮\\Documents\\Codex\\2026-11-06\\new-chat-5\\outputs\\harness-v0.40-after-tool-20261115",
+  "real_model_requests": 0,
+  "runtime_restarted": false,
+  "real_user_checkpoints_modified": false,
+  "before_basic": {
+    "tests": 262,
+    "passed": 262,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "seconds": 32.583,
+    "failure_ids": [],
+    "log": "C:\\Users\\叶宸玮\\Documents\\Codex\\2026-11-06\\new-chat-5\\outputs\\harness-v0.40-after-tool-20261115\\before-basic.log"
+  },
+  "before_native": {
+    "tests": 6,
+    "passed": 4,
+    "failures": 2,
+    "errors": 0,
+    "skipped": 0,
+    "seconds": 14.578,
+    "failure_ids": [
+      "test_real_bash_pipeline_with_rg (test_sandbox_native.NativeSandboxScenarios.test_real_bash_pipeline_with_rg)",
+      "test_real_registry_credential_canary_is_not_readable (test_sandbox_native.NativeSandboxScenarios.test_real_registry_credential_canary_is_not_readable)"
+    ],
+    "log": "C:\\Users\\叶宸玮\\Documents\\Codex\\2026-11-06\\new-chat-5\\outputs\\harness-v0.40-after-tool-20261115\\before-native.log"
+  },
+  "work_basic": {
+    "tests": 277,
+    "passed": 277,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "seconds": 32.754,
+    "failure_ids": [],
+    "log": "C:\\Users\\叶宸玮\\Documents\\Codex\\2026-11-06\\new-chat-5\\outputs\\harness-v0.40-after-tool-20261115\\work-basic.log"
+  },
+  "final_basic": {
+    "tests": 277,
+    "passed": 277,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "seconds": 31.359,
+    "failure_ids": [],
+    "log": "C:\\Users\\叶宸玮\\Documents\\Codex\\2026-11-06\\new-chat-5\\outputs\\harness-v0.40-after-tool-20261115\\final-basic.log"
+  },
+  "final_mcp_stdio": {
+    "tests": 4,
+    "passed": 4,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "seconds": 7.315,
+    "failure_ids": [],
+    "log": "C:\\Users\\叶宸玮\\Documents\\Codex\\2026-11-06\\new-chat-5\\outputs\\harness-v0.40-after-tool-20261115\\final-mcp-stdio.log"
+  },
+  "final_mcp_http": {
+    "tests": 1,
+    "passed": 1,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "seconds": 4.239,
+    "failure_ids": [],
+    "log": "C:\\Users\\叶宸玮\\Documents\\Codex\\2026-11-06\\new-chat-5\\outputs\\harness-v0.40-after-tool-20261115\\final-mcp-http.log"
+  },
+  "final_native": {
+    "tests": 6,
+    "passed": 4,
+    "failures": 2,
+    "errors": 0,
+    "skipped": 0,
+    "seconds": 14.049,
+    "failure_ids": [
+      "test_real_bash_pipeline_with_rg (test_sandbox_native.NativeSandboxScenarios.test_real_bash_pipeline_with_rg)",
+      "test_real_registry_credential_canary_is_not_readable (test_sandbox_native.NativeSandboxScenarios.test_real_registry_credential_canary_is_not_readable)"
+    ],
+    "log": "C:\\Users\\叶宸玮\\Documents\\Codex\\2026-11-06\\new-chat-5\\outputs\\harness-v0.40-after-tool-20261115\\final-native.log"
+  },
+  "new_offline_test_methods": 15,
+  "default_behavior_equivalence": {
+    "baseline": "0.39",
+    "candidate": "0.40",
+    "after_tool": null,
+    "passed": 8,
+    "independent_child_processes": 22,
+    "real_model_requests": 0,
+    "normalization": [
+      "temporary source/scenario paths",
+      "checkpoint binding.source fingerprint"
+    ],
+    "cases": [
+      {
+        "scenario": "mixed",
+        "equal": true,
+        "observations": 81,
+        "sha256": "437102f070b5643c3c3638ba255f82cd6a7f8d8e4ad16d795544281c61e039bd"
+      },
+      {
+        "scenario": "verification",
+        "equal": true,
+        "observations": 41,
+        "sha256": "3a3d509b28fac45657c06223719513e9c7147874b12c717ec1a3b0228ff3bf77"
+      },
+      {
+        "scenario": "save_executing",
+        "equal": true,
+        "observations": 18,
+        "sha256": "c2a5adec0ad620e4b7cdc9ff103a50536a43cb6ffa1236f95f864bdd3d5186a2"
+      },
+      {
+        "scenario": "save_recorded",
+        "equal": true,
+        "observations": 24,
+        "sha256": "1d798f967cd6cec551e401e5ae716f731878a159cb7d780a92128706dc28e9b1"
+      },
+      {
+        "scenario": "hard_exit",
+        "equal": true,
+        "observations": 17,
+        "sha256": "0da8625c47b93a0a068930108b890ddab2edc1e4219d62450645b55b3fa0a9a7"
+      },
+      {
+        "scenario": "event_exception",
+        "equal": true,
+        "observations": 20,
+        "sha256": "f78daf63684b6f51e43c9a38cbb018b0b4eb752acf2dd22a7f01e3b3b975eb1d"
+      },
+      {
+        "scenario": "pending_resume",
+        "equal": true,
+        "observations": 43,
+        "sha256": "98ba4cc235cd32160114d082d7389324d989945c413f961dce363835cd5519ac"
+      },
+      {
+        "scenario": "evidence_filter",
+        "equal": true,
+        "observations": 51,
+        "sha256": "23c922c1d96c877514fecd627125ec85e2d703d56f264e8d49d26819f9d46c74"
+      }
+    ]
+  },
+  "hard_exit_recovery": {
+    "before_notify": {
+      "verified_crash_exit_code": 51,
+      "requests": 2,
+      "effects": 1,
+      "notifications": 0,
+      "resume_status": "ready",
+      "resume_stop_reason": "end_turn",
+      "binding_unchanged": true,
+      "effect_file_after_resume": "external edit survives resume"
+    },
+    "in_notify": {
+      "verified_crash_exit_code": 52,
+      "requests": 2,
+      "effects": 1,
+      "notifications": 1,
+      "resume_status": "ready",
+      "resume_stop_reason": "end_turn",
+      "binding_unchanged": true,
+      "effect_file_after_resume": "external edit survives resume"
+    }
+  },
+  "contract": {
+    "hook": "after_tool=None",
+    "summary": "ToolResultSummary(frozen=True, slots=True), nine scalar fields",
+    "timing": "after existing result event and successful return of existing checkpoint save",
+    "no_store": "memory recording only, no durability claim",
+    "delivery": "best-effort / at-most-once within Agent-managed lifecycle; no retries or recovery backfill",
+    "exceptions": "ordinary callback and warning failures isolated; BaseException propagates",
+    "trust": "trusted synchronous Python, must not reenter or mutate Agent, no isolation or hard timeout",
+    "sources": "model and verification, including normal rejection/error results",
+    "excluded": "direct _invoke_tool, _finish synthetic unknown results, failures before record/save"
+  },
+  "integrity": {
+    "unchanged_runtime_modules": [
+      "checkpoint.py",
+      "cli.py",
+      "context.py",
+      "execution_backend.py",
+      "file_edits.py",
+      "file_search.py",
+      "limits.py",
+      "mcp_adapter.py",
+      "mcp_notes_server.py",
+      "model_base.py",
+      "model_deepseek.py",
+      "model_openai.py",
+      "models.py",
+      "permissions.py",
+      "prompts.py",
+      "sandbox.py",
+      "state.py",
+      "token_usage.py",
+      "tools.py",
+      "verification.py"
+    ],
+    "bfcl_and_old_v0_files": 24,
+    "all_old_fixtures_unchanged": true,
+    "historical_version_entries_unchanged": 12,
+    "state_and_checkpoint_unchanged": true,
+    "agent_methods_changed": [
+      "__init__",
+      "handle_call"
+    ],
+    "readme_unchanged": true
+  },
+  "review": {
+    "kind": "fresh read-only review plus final focused recheck",
+    "model": "gpt-6.1-sol",
+    "reasoning_effort": "high",
+    "outstanding_must_fix": 0,
+    "closed_finding": "Materialize text fields as exact builtin str to exclude mutable attributes on accepted str subclasses",
+    "evidence": "C:\\Users\\叶宸玮\\Documents\\Codex\\2026-11-06\\new-chat-5\\outputs\\harness-v0.40-after-tool-20261115\\stage\\review.md"
+  },
+  "scope": "No Hooks Registry, no hooks.py, no state/schema/model/permission/backend changes; Bash and credential isolation deferred",
+  "deployment_precondition": "Archive unfinished old checkpoints before switching runtime; strict cross-version binding is retained",
+  "changed_files": [
+    "VERSION.json",
+    "agent.py",
+    "tests/after_tool_child.py",
+    "tests/test_after_tool.py",
+    "tests/test_after_tool_recovery.py",
+    "tool_runner.py",
+    "docs/validation/2026-11-15-after-tool.json"
+  ]
+}

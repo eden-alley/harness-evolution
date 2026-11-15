@@ -1,0 +1,139 @@
+{
+  "change": "progress_message_role_r1_r2",
+  "harness_version": "v0.32",
+  "recorded_at_utc": "2026-11-13T15:11:04.787040+00:00",
+  "approved_scope": "Only progress message role assistant -> user; existing location/content/exit logic unchanged. R3/R4 not executed.",
+  "real_model_requests": 0,
+  "real_model_compatibility_verified": false,
+  "validation": {
+    "baseline_basic": {
+      "tests": 160,
+      "passed": 160,
+      "exit_code": 0,
+      "log": "2026-11-13-progress-message-role-r1-r2/baseline-offline.log"
+    },
+    "red_focused": {
+      "tests": 12,
+      "failures": 8,
+      "errors": 0,
+      "exit_code": 1,
+      "reason": "Two frozen requests explicitly assistant != user; existing display expectations also fail before role edit.",
+      "log": "2026-11-13-progress-message-role-r1-r2/red-focused.log"
+    },
+    "green_focused": {
+      "tests": 12,
+      "passed": 12,
+      "exit_code": 0,
+      "log": "2026-11-13-progress-message-role-r1-r2/green-focused.log"
+    },
+    "final_basic": {
+      "tests": 162,
+      "passed": 162,
+      "exit_code": 0,
+      "command": ".venv-mcp/Scripts/python.exe -B -X utf8 tests/run_offline.py",
+      "log": "2026-11-13-progress-message-role-r1-r2/final-offline.log"
+    },
+    "mcp_stdio": {
+      "tests": 4,
+      "passed": 4,
+      "exit_code": 0,
+      "log": "2026-11-13-progress-message-role-r1-r2/final-mcp-stdio.log"
+    },
+    "mcp_http": {
+      "tests": 1,
+      "passed": 1,
+      "exit_code": 0,
+      "log": "2026-11-13-progress-message-role-r1-r2/final-mcp-http.log"
+    },
+    "native": {
+      "tests": 6,
+      "passed": 4,
+      "failed": 2,
+      "skipped": 0,
+      "exit_code": 1,
+      "failures": [
+        "test_real_bash_pipeline_with_rg",
+        "test_real_registry_credential_canary_is_not_readable"
+      ],
+      "same_failures_on_exact_before_source_and_same_fixture_root": true,
+      "baseline_log": "2026-11-13-progress-message-role-r1-r2/baseline-native.log",
+      "final_log": "2026-11-13-progress-message-role-r1-r2/final-native.log"
+    }
+  },
+  "fixture": {
+    "path": "tests/fixtures/task_progress_requests.json",
+    "sha256": "362c78d61bf53d169242dfd3d7731df939b6d8497968a669341a5ad54112691b",
+    "cases": [
+      {
+        "case_id": "C01",
+        "local_request": 6,
+        "batch_request": 45,
+        "payload_sha256": "35873ead47b89bfef054a0b2b7591289ac532a83c81d4b0b272f23397fb29500"
+      },
+      {
+        "case_id": "U03",
+        "local_request": 6,
+        "batch_request": 52,
+        "payload_sha256": "39b1c665ddfb7bcbad78c14f34251e79b27c322e50593d78a16e3409d56776c6"
+      }
+    ],
+    "wire_comparison": "All request body fields match the original at SDK MockTransport boundary except last progress-card role; extra_body is normalized by SDK serialization.",
+    "no_fixture_command_or_tool_execution": true,
+    "no_credentials_or_authorization_headers_copied": true
+  },
+  "scope_audit": {
+    "changed_existing_files": [
+      "agent.py",
+      "tests/test_task_progress.py",
+      "VERSION.json"
+    ],
+    "only_runtime_diff": "agent.py:346 role assistant -> user",
+    "exit_rules_byte_preserved": true,
+    "root_source_other_than_agent_unchanged": true,
+    "state_checkpoint_schema_permissions_prompts_context_sandbox_unchanged": true,
+    "bfcl_and_v0_files_checked_unchanged": 24,
+    "previous_version_entries_and_other_metadata_preserved": true,
+    "progress_default_off_unchanged": true
+  },
+  "source_sha256": "33d6f291060c69f91a2cc697f34cb83767a4319b77286f67e685a45699f71b6a",
+  "source_files": {
+    "agent.py": "b23f53d2eefab035cd2b8316da298b4b1544c6766e4866ba93a643e9f867962b",
+    "checkpoint.py": "0f6931d8f37fbd6028b6f1de58c864edab04a9569ea0873485f1c804987e1f7a",
+    "cli.py": "59a0da1639037470379a3566d97961cfaa0b76f4e4c6ad287f0cbc79be05e6a9",
+    "context.py": "a04bf4649228d142b0d58730287c5f0ea952252ca2a23999b6e03e89982a747b",
+    "execution_backend.py": "72db6ddd13dbd8d50fd41dd03bf6e6f5ebf3c954828b978ff34dbe3f37e86fdf",
+    "limits.py": "99c44642b4d1b31ae956bf5065e90f0ef9c936e060cae97b2999eac57602549e",
+    "mcp_adapter.py": "83538d7bf79386e30d0a90664c5d2e95a1cced4ea58c8f01c6594d0c6108ec8e",
+    "mcp_notes_server.py": "a72d5d8ffe6484d592b9bf6ab04076c329e903fa40590476cf8a0d9fd7cbe4b5",
+    "model_base.py": "f85a3caff31f92c1be90b76b1f83dd70cfc7488c0e1389f2c3e377ac02af8291",
+    "model_deepseek.py": "65a62aa554cf06fddbbb760072101e97e649e656ac0456551be2b37b5a673b32",
+    "model_openai.py": "8b5ff03cb832f6b449dae1fadc63b61031ffa617e43e4c95bd46178b343fbbd6",
+    "models.py": "c5b35da4892f067391b11b0484b279b98a7ea363acc792bdfe7124212736c3e7",
+    "permissions.py": "1fce687e3716e4860b1833a2289dffa11d5799d528c88d5782a4d4661a5ff42c",
+    "prompts.py": "e242466173010402b54f5cc4cc337b778a6913fb632592a9bb305fc5efa37f20",
+    "sandbox.py": "3217f48e2ae40869f5c4da6574a9696f47d6ec935359b3a056e7968ba10bfb71",
+    "state.py": "fb714e9cf9061c41ff0f76be1a6987b28789ef565a6cbc6792fb67283af96531",
+    "token_usage.py": "226e2b67a83a015a6dd92e30f071fe6264eb79fab5249e16b08e0b6f84151bb9",
+    "tools.py": "af0a1fabdcbfd38a140b8457a0d1e09ddb258ce79d4ef6b990daef475255f9e3",
+    "verification.py": "4ec18add9d3a242a018a84fb9072c41d9e7b8e90ee273bde6b8fac40099dbbb3"
+  },
+  "independent_review": {
+    "status": "complete",
+    "reviewer": "gpt-6.1-sol/high",
+    "findings": [],
+    "scope": "Exact before/after runtime diff, actual-loop SDK payload tests, fixture provenance and unchanged exit semantics reviewed read-only."
+  },
+  "limitations": [
+    "Offline replay verifies request assembly and existing exit semantics, not real-model behavior.",
+    "Cause of abnormal model text is not established; no causal experiment or paid task rerun.",
+    "The existing source binding still rejects cross-source checkpoint resume; old checkpoints were not migrated.",
+    "Known Git Bash/MSYS and registry-credential isolation failures remain visible and were not changed."
+  ],
+  "final_verification": {
+    "source_matches_tested_patch": true,
+    "old_version_entries_and_rules_unchanged": true,
+    "protected_hashes_unchanged": true,
+    "model_calls": 0,
+    "completed": true
+  }
+}

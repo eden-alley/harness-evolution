@@ -1,13 +1,16 @@
 """终端入口：本机初始化、命令交互与会话保存。"""
 import os
 import math
+import json
 from contextlib import nullcontext
 from uuid import uuid4
 from urllib.parse import urlsplit
 
 from agent import Agent, MODEL, MAX_STEPS, models, checkpoints
 from context import SessionStore
-from permissions import Workspace
+from context import CONTEXT_INPUT_BUDGET, COMPACT_THRESHOLD, COMPACT_TARGET_MIN, COMPACT_TARGET_MAX
+from mcp_adapter import MCPStartupError, open_mcp
+from permissions import PermissionManager, Workspace
 from prompts import SYSTEM
 from tools import Toolset
 
@@ -22,11 +25,32 @@ def limit_setting(name, default, parse):
         raise ValueError(f'{name} 必须是非负{"整数" if parse is int else "有限数"}，0 表示关闭') from None
 
 
-def create_agent():
+def tool_setting():
+    raw = os.environ.get("AGENT_TOOLS")
+    if raw is None:
+        return None
+    try:
+        names = json.loads(raw)
+    except json.JSONDecodeError as error:
+        raise ValueError("AGENT_TOOLS 必须是 JSON 字符串数组，例如 [\"read_file\"]；[] 表示无工具") from error
+    if not isinstance(names, list):
+        raise ValueError("AGENT_TOOLS 必须是 JSON 数组；省略表示默认，[] 表示无工具")
+    return names
+
+
+def create_agent(*, mcp=None, workspace=None):
     # 只有启动真实程序时读取现有密钥并创建 SDK 客户端。
+    task_progress = os.environ.get('AGENT_TASK_PROGRESS', 'off')
+    if task_progress not in ('on', 'off'):
+        raise ValueError('AGENT_TASK_PROGRESS 必须是 on 或 off，默认 off')
+    selected_tools = tool_setting()
     steps = limit_setting('AGENT_STEP_LIMIT', MAX_STEPS, int)
     tokens = limit_setting('AGENT_TOKEN_LIMIT', 0, int)
     seconds = limit_setting('AGENT_TIME_LIMIT_SECONDS', 0, float)
+    context_budget = limit_setting('AGENT_CONTEXT_INPUT_TOKENS', CONTEXT_INPUT_BUDGET, int)
+    compact_threshold = limit_setting('AGENT_COMPACT_THRESHOLD_TOKENS', COMPACT_THRESHOLD, int)
+    target_min = limit_setting('AGENT_COMPACT_TARGET_MIN_TOKENS', COMPACT_TARGET_MIN, int)
+    target_max = limit_setting('AGENT_COMPACT_TARGET_MAX_TOKENS', COMPACT_TARGET_MAX, int)
     provider = os.environ.get('MODEL_PROVIDER', 'deepseek')
     config = models.ModelConfig(
         provider=provider,
@@ -41,6 +65,9 @@ def create_agent():
         raise ValueError('openai_chat 必须明确配置 MODEL、BASE_URL 和 MODEL_API_KEY_ENV')
     if not trusted_default and not key_env:
         raise ValueError('自定义模型地址必须明确配置 MODEL_API_KEY_ENV，不自动沿用 DeepSeek 密钥')
+    if workspace is None:
+        workspace = Workspace(os.environ.get("NAMI_WORKSPACE", os.getcwd()))
+    toolset = Toolset(workspace, mcp=mcp, task_progress=task_progress == 'on', enabled_tools=selected_tools)
     if key_env:
         api_key = os.environ.get(key_env)
         if not api_key:
@@ -52,9 +79,27 @@ def create_agent():
             with winreg.OpenKey(winreg.HKEY_CURRENT_USER, 'Environment') as env:
                 api_key = winreg.QueryValueEx(env, 'DEEPSEEK_API_KEY')[0]
     adapter = models.get_model(config, api_key=api_key)
-    workspace = Workspace(os.environ.get("NAMI_WORKSPACE", os.getcwd()))
-    return Agent(adapter.client, Toolset(workspace), model=config.model_name, model_adapter=adapter,
-                 max_steps=steps or None, token_limit=tokens, wall_time_limit_seconds=seconds)
+    permissions = (PermissionManager(workspace=workspace, mcp_read_only=mcp.read_only_tools)
+                   if mcp is not None else None)
+    return Agent(adapter.client, toolset, permissions=permissions,
+                 model=config.model_name, model_adapter=adapter,
+                 max_steps=steps or None, token_limit=tokens, wall_time_limit_seconds=seconds,
+                 soft_limit=compact_threshold, hard_limit=context_budget,
+                 compact_target_min=target_min, compact_target_max=target_max,
+                 progress_report=os.environ.get("AGENT_PROGRESS_REPORT"),
+                 progress_test=os.environ.get("AGENT_PROGRESS_TEST"))
+
+
+def handle_tools(agent):
+    names = [schema["function"]["name"] for schema in agent.tools.get_schemas()]
+    print(f"当前可用工具（{len(names)}）：")
+    if not names:
+        print("  （无工具）")
+    locations = {"host": "宿主机", "sandbox": "沙箱", "backend": "自定义执行后端",
+                 "host_mcp": "宿主 MCP", "remote_mcp": "远程 MCP", "unknown": "执行位置未标明"}
+    for name in names:
+        location = agent.tools.execution_info(name)["location"]
+        print(f"  {name}：{locations.get(location, location)}")
 
 
 def handle_auto(args, perms):
@@ -64,7 +109,7 @@ def handle_auto(args, perms):
     elif len(args) == 1 and args[0] in ("on", "off"):
         perms.set_auto_approve(args[0] == "on")
         if perms.auto_approve:
-            print("自动执行已开启：现有工具免确认；路径硬规则和命令沙箱仍生效，fetch_url 在宿主执行。\n")
+            print("自动执行已开启。已登记的原生工具免确认，MCP 工具按本地权限配置确认。\n")
         else:
             print("自动执行已关闭：需确认的工具恢复询问，已清除本次记住的工具授权。\n")
     else:
@@ -96,6 +141,7 @@ def start_new_session(agent, store):
                 raise
         agent.messages = fresh
         agent.last_prompt_tokens = 0   # 只重置压缩依据，不清零 token 累计。
+        agent.context_scale = 1.0
         print(f"已开始新会话；旧会话已备份为 {backup_name}.json；token 累计保留。\n")
 
 
@@ -130,7 +176,21 @@ def recovery_pending(agent):
 
 def main(agent=None, store=None):
     terminal = agent is None
-    agent = agent if agent is not None else create_agent()
+    config_path = os.environ.get("NAMI_MCP_CONFIG") if terminal else None
+    workspace = Workspace(os.environ.get("NAMI_WORKSPACE", os.getcwd())) if config_path else None
+    connection = open_mcp(config_path, workspace=workspace.root) if config_path else nullcontext()
+    try:
+        with connection as mcp:
+            if terminal:
+                agent = create_agent(mcp=mcp, workspace=workspace)
+            if mcp is not None:
+                print("已加载 MCP 工具 " + ", ".join(mcp.tools))
+            run_session(agent, store, terminal=terminal)
+    except MCPStartupError as error:
+        raise SystemExit(str(error)) from error
+
+
+def run_session(agent, store, *, terminal):
     store = store if store is not None else SessionStore()
     if terminal and agent.checkpoint_store is None:
         agent.checkpoint_store = checkpoints.CheckpointStore(store.directory.parent / 'checkpoints')
@@ -143,6 +203,10 @@ def main(agent=None, store=None):
             cp.trace_path = store.directory / 'default.trace.jsonl'
             if recovery_pending(agent):
                 print('检测到未同步检查点：' + agent.inspect_checkpoint()['reason'])
+        if terminal:
+            handle_tools(agent)
+        if terminal and agent.tools.enabled_tools is None and not agent.tools.search_available:
+            print("搜索工具未启用：未找到工作区外已安装的 rg；原有工具仍可使用。")
         print("自动执行默认关闭；/auto on 开启，/auto off 关闭，/auto 查看状态。")
         interact(agent, store)
 
@@ -155,6 +219,12 @@ def interact(agent, store):
         command = q.split()
         if command and command[0] == "/auto":
             handle_auto(command[1:], agent.permissions)
+            continue
+        if command and command[0] == "/tools":
+            if len(command) == 1:
+                handle_tools(agent)
+            else:
+                print("用法：/tools 查看当前可用工具；更改 AGENT_TOOLS 后重启生效。")
             continue
         if q == "/new":
             start_new_session(agent, store)

@@ -1,4 +1,5 @@
 """Token 统计的离线场景：正常与摘要累计，以及缺少 usage 和请求失败。"""
+from test_file_reads import file_page
 import contextlib
 import io
 import unittest
@@ -36,7 +37,7 @@ class TokenUsageScenarios(OfflineScenario):
         self.assertIn("输入=220 输出=20 合计=240", text)
         self.assertIn("本次运行累计：输入=1420 输出=80 合计=1500", text)
         self.assertEqual(self.agent.last_prompt_tokens, 220)
-        self.assertEqual(tool_text(self.requests[2]["messages"][-1]["content"]), "ok")
+        self.assertEqual(file_page(tool_text(self.requests[2]["messages"][-1]["content"]))[1], ["ok"])
         self.assertEqual(len(self.requests), 3)
 
     def test_missing_usage_and_failed_requests_are_not_invented_or_added_to_totals(self):

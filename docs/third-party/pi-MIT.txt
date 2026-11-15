@@ -1,0 +1,70 @@
+Pi source attribution
+
+Newline normalization/original-offset mapping and selected CRLF/BOM/mixed-ending
+regression cases are adapted from earendil-works/pi at commit
+827383a15262905f82e418483825a49dbb1adbf5:
+  packages/coding-agent/src/core/tools/edit-diff.ts
+  packages/coding-agent/test/tools.test.ts
+https://github.com/earendil-works/pi/tree/827383a15262905f82e418483825a49dbb1adbf5
+
+Python strict matching, scoped diff, workspace/permission integration and staged
+file publication are local adaptations. Pi's fuzzy fallback is not enabled.
+Local line-ending selection also treats lone CR as a line break in mixed files,
+matching this project's CR/LF/CRLF contract rather than Pi's LF-first rule.
+
+Search interfaces, original-search-scope path semantics and actionable limit
+notices refer to the same pinned Pi commit:
+  packages/coding-agent/src/core/tools/find.ts
+  packages/coding-agent/src/core/tools/grep.ts
+The Python search engine uses installed ripgrep for both tools, with local
+workspace filtering, basic-glob matching and harness result storage. These
+are adaptations rather than execution of the TypeScript SDK.
+
+Complete-line reading, actionable continuation notices and explicit out-of-range /
+oversized-line handling refer to the same pinned Pi commit:
+  packages/coding-agent/src/core/tools/read.ts
+  packages/coding-agent/src/core/tools/truncate.ts
+The Python adaptation keeps start_line/end_line, the existing 4000-character or
+explicit UTF-8 preview budget, and current-task result recall via character offsets.
+It peeks for EOF instead of scanning the rest solely to count all file lines.
+It retains the oversized-single-line limitation and does not add Pi's image or
+Bash reading path. State/checkpoint persist returned pages, not unread file tails.
+
+Whole-file tool responsibilities refer to the same pinned Pi commit:
+  packages/coding-agent/src/core/tools/write.ts
+  packages/coding-agent/src/core/tools/file-mutation-queue.ts
+Pi's default writer directly writes UTF-8; this project does not claim Pi supplies
+the staged-publication guarantee. The local edit/write tools share the existing
+Python staging, file checks and conflict detection. The current Agent executes
+tool calls sequentially, so no new asynchronous mutation queue is added.
+
+Tool selection follows the same pinned Pi commit's explicit tool-group / tool-list
+approach:
+  packages/coding-agent/src/core/tools/index.ts
+  packages/coding-agent/src/cli/args.ts
+The local Python adaptation uses a per-Toolset exact allowlist, startup-only
+AGENT_TOOLS JSON and a read-only /tools command. It does not copy Pi's patterns,
+add/remove/exclude precedence, extension discovery or live tool switching.
+MCP connection-side allowlists, permissions and checkpoint bindings remain local.
+
+MIT License
+
+Copyright (c) 2025 Mario Zechner
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

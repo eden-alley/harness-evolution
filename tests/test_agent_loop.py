@@ -13,6 +13,7 @@ import unittest
 from unittest.mock import patch
 
 from scenario_support import OfflineScenario, agent, permissions, tools, answer, call, tool_reply, tool_text
+from test_file_reads import file_page
 
 
 class AgentLoopScenarios(OfflineScenario):
@@ -46,21 +47,108 @@ class AgentLoopScenarios(OfflineScenario):
         raw_outputs = {m["tool_call_id"]: m["content"] for m in self.requests[1]["messages"] if m["role"] == "tool"}
         outputs = {key: tool_text(value) for key, value in raw_outputs.items()}
         self.assertEqual(outputs["list"], "(空目录)")
-        self.assertEqual(outputs["read"], 'print("offline-ok")\n')
-        self.assertTrue(outputs["read-long"].startswith("x" * 2000 + "\n...[中间省略"))
-        self.assertLess(len(outputs["read-long"]), 4200)
-        self.assertIn("8101", outputs["read-long"])
+        self.assertEqual(file_page(outputs["read"])[1], ['print("offline-ok")'])
+        self.assertEqual(json.loads(raw_outputs["read-long"])["code"], "output_limit_exceeded")
         self.assertEqual(outputs["shell"].splitlines(), ["[exit 0]", "offline-ok"])
         self.assertEqual(outputs["fetch"], "网页样本")
         self.assertEqual(asked, ["write_file", "run_shell", "fetch_url"])
         schemas = {t["function"]["name"]: t["function"] for t in self.requests[0]["tools"]}
-        self.assertEqual(set(schemas), {"list_dir", "read_file", "write_file", "run_shell", "fetch_url"})
+        expected_names = {"list_dir", "read_file", "read_tool_result", "write_file", "edit_file", "run_shell", "fetch_url"}
+        if self.tools.search_available:
+            expected_names.update({"find_files", "search_text"})
+        self.assertEqual(set(schemas), expected_names)
         self.assertEqual(schemas["write_file"]["parameters"]["required"], ["path", "content"])
         result, _ = self.run_agent("继续上一个任务", permissions.PermissionManager(workspace=self.tools.workspace, ), messages)
         self.assertEqual(result, "还能看到上次的文件内容")
         self.assertIn({"role": "user", "content": "创建、读取、运行并抓网页"}, self.requests[2]["messages"])
         self.assertIn({"role": "tool", "tool_call_id": "shell", "content": raw_outputs["shell"]}, self.requests[2]["messages"])
         self.assertEqual(len(self.requests), 3)
+
+    def test_read_file_range_returns_complete_lines_and_continues(self):
+        line = "中" * 1800
+        (self.workspace / "code.txt").write_bytes(
+            ("开头\r\n" + (line + "\r\n") * 2 + "末尾").encode("utf-8"))
+        self.model([
+            tool_reply(call("first", "read_file", {"path": "code.txt", "start_line": 2, "end_line": 4})),
+            answer("已读取"),
+        ])
+        result, _ = self.run_agent("只读取代码片段", self.agent.permissions)
+        self.assertEqual(result, "已读取")
+        output = next(json.loads(m["content"]) for m in self.requests[1]["messages"] if m["role"] == "tool")
+        self.assertEqual(file_page(output["data"])[1], [line, line, "末尾"])
+        (self.workspace / "long.txt").write_text((line + "\n") * 3, encoding="utf-8")
+        first = self.tools.execute("read_file", {"path": "long.txt", "start_line": 1})
+        self.assertEqual(file_page(first.data)[1:], ([line, line], {"path": "long.txt", "start_line": 3}))
+        remaining = self.tools.execute("read_file", {"path": "long.txt", "start_line": 3})
+        self.assertEqual(file_page(remaining.data)[1:], ([line], None))
+        for args, expected in [
+            ({"path": "code.txt", "start_line": 0}, "invalid_arguments"),
+            ({"path": "code.txt", "start_line": 3, "end_line": 2}, "invalid_arguments"),
+            ({"path": "../outside.txt", "start_line": 1}, "policy_denied"),
+        ]:
+            with self.subTest(args=args):
+                self.assertEqual(self.tools.execute("read_file", args).code, expected)
+
+    def test_saved_tool_result_recovers_evidence_after_truncation_and_cleanup(self):
+        text = "A" * 3100 + "实测 0.285714" + "B" * 3000
+        with patch.object(self.agent.tools, "run_command") as command:
+            command.return_value = subprocess.CompletedProcess([], 0, text.encode(), b"")
+            self.model([
+                tool_reply(call("test", "run_shell", {"command": "echo offline-fixture"})),
+                (tool_reply(*(call(f"list-{i}", "list_dir", {}) for i in range(3))),
+                 16001),
+                tool_reply(call("recover", "read_tool_result", {"call_id": "test", "offset": 3000})),
+                answer("已核实"),
+                tool_reply(call("stale", "read_tool_result", {"call_id": "test"})),
+                answer("历史结果不可查"),
+            ])
+            perms = permissions.PermissionManager(workspace=self.tools.workspace, ask=lambda *args: ("y", ""))
+            result, messages = self.run_agent("查测试结果", perms)
+            self.assertEqual(result, "已核实")
+            command.assert_called_once()
+            view = lambda index, key: next(m["content"] for m in self.requests[index]["messages"]
+                                           if m.get("tool_call_id") == key)
+            clipped = json.loads(view(1, "test"))
+            self.assertEqual(clipped["saved_call_id"], "test")
+            self.assertNotIn("0.285714", clipped["data"])
+            self.assertEqual(json.loads(view(2, "test"))["saved_call_id"], "test")
+            self.assertIn("实测 0.285714", tool_text(view(3, "recover")))
+            self.run_agent("新任务", perms, messages)
+            self.assertEqual(json.loads(view(5, "stale"))["code"], "result_unavailable")
+
+    def test_progress_reminder_requires_repeated_reads_and_missing_milestones(self):
+        (self.workspace / "seed.txt").write_text("证据\n" * 7, encoding="utf-8")
+        for mode in ("repeat", "different", "report_ready", "test_ready"):
+            with self.subTest(mode=mode):
+                self.requests.clear()
+                self.agent.progress_report = "report.md"
+                self.agent.progress_test = "echo offline-test"
+                report = self.workspace / "report.md"
+                report.unlink(missing_ok=True)
+                if mode == "report_ready":
+                    report.write_text("已交付", encoding="utf-8")
+                replies = []
+                if mode == "test_ready":
+                    replies.append(tool_reply(call("test", "run_shell", {"command": "echo offline-test"})))
+                for i in range(7):
+                    args = {"path": "seed.txt"}
+                    if mode == "different":
+                        args["start_line"] = i + 1
+                    replies.append(tool_reply(call(f"read-{i}", "read_file", args)))
+                self.model([*replies, answer("完成")])
+                perms = permissions.PermissionManager(workspace=self.tools.workspace, ask=lambda *args: ("y", ""))
+                with patch.object(self.agent.tools, "run_command",
+                                  return_value=subprocess.CompletedProcess([], 0, b"ok", b"")):
+                    result, messages = self.run_agent("读代码并交付报告", perms)
+                self.assertEqual(result, "完成")
+                hints = [m["content"] for request in self.requests for m in request["messages"]
+                         if m["role"] == "system" and "近期有多次相同查阅" in m["content"]]
+                self.assertEqual(len(hints), int(mode == "repeat"))
+                self.assertEqual(len(self.requests), len(replies) + 1)
+                if hints:
+                    self.assertIn("report.md 尚未出现", hints[0])
+                    self.assertIn("指定测试尚无成功记录", hints[0])
+                self.assertFalse(any(m.get("content") in hints for m in messages))
 
     def test_errors_and_denials_are_returned_without_side_effects_or_aborting_batch(self):
         """抓住异常中断、拒绝后仍写入、硬规则绕过或漏回 tool_call_id。"""
@@ -90,7 +178,7 @@ class AgentLoopScenarios(OfflineScenario):
                               "danger": "危险模式", "timeout": "[超时]"}.items():
             with self.subTest(call_id=call_id):
                 self.assertIn(text, outputs[call_id])
-        self.assertEqual(tool_text(outputs["last"]), "后续工具仍执行")
+        self.assertEqual(file_page(tool_text(outputs["last"]))[1], ["后续工具仍执行"])
         self.assertEqual(sorted(p.name for p in self.workspace.iterdir()), ["seed.txt"])
         self.assertFalse((self.workspace.parent / "outside.txt").exists())
         self.assertEqual([name for name, _ in asked], ["write_file", "run_shell"])

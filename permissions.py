@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import json
 import re
 import sys
 from copy import deepcopy
@@ -34,14 +35,19 @@ class Risk(Enum):
 # 工具风险登记表。没登记的工具一律按 CONFIRM 处理。
 TOOL_RISK = {
     "list_dir": Risk.SAFE,
+    "find_files": Risk.SAFE,
+    "search_text": Risk.SAFE,
     "read_file": Risk.SAFE,
+    "read_tool_result": Risk.SAFE,
+    "update_progress": Risk.SAFE,
     "write_file": Risk.CONFIRM,
+    "edit_file": Risk.CONFIRM,
     "run_shell": Risk.CONFIRM,
     "fetch_url": Risk.CONFIRM,
 }
 
 # 人工确认模式允许"本次会话一直允许"的工具。run_shell 在此模式下仍逐条确认。
-REMEMBERABLE = {"write_file"}
+REMEMBERABLE = {"write_file", "edit_file"}
 
 # 明显的灾难性命令。注意：这是安全带，不是边界（见文章第八节）。
 SHELL_DENY_PATTERNS = [
@@ -77,7 +83,19 @@ def fetch_url_denial(url):
 def render_call(name: str, args: dict, max_chars: int = 400) -> str:
     """确认界面：展示将要执行的真实内容，而不是模型的自述。"""
     if name == "run_shell":
-        return f"  $ {args.get('command', '')}"
+        return f"  [{args.get('shell', 'cmd')}] $ {args.get('command', '')}"
+    if name == "edit_file":
+        edits = args.get("edits", [])
+        pieces = []
+        for index, edit in enumerate(edits, 1):
+            old = json.dumps(edit.get("oldText", "")[:max_chars], ensure_ascii=False)
+            new = json.dumps(edit.get("newText", "")[:max_chars], ensure_ascii=False)
+            pieces.append(f"第 {index} 处：{old} → {new}")
+        detail = "\n".join(pieces)
+        preview = detail[:max_chars]
+        if len(detail) > max_chars:
+            preview += "\n...（预览已截断）"
+        return f"  路径：{str(args.get('path'))[:max_chars]}；共 {len(edits)} 处替换\n" + indent(preview, "    ")
     if name == "write_file":
         content = args.get("content", "")
         preview = content[:max_chars]
@@ -88,13 +106,14 @@ def render_call(name: str, args: dict, max_chars: int = 400) -> str:
 
 
 class PermissionManager:
-    def __init__(self, ask=None, *, workspace=None):
+    def __init__(self, ask=None, *, workspace=None, mcp_read_only=()):
         if workspace is None:
             workspace = os.environ.get("NAMI_WORKSPACE", os.getcwd())
         self.workspace = (workspace if isinstance(workspace, Workspace)
                           else Workspace(workspace))
         self.always_allowed: set[str] = set()
         self.auto_approve = False
+        self.mcp_read_only = frozenset(mcp_read_only)
         # ask 可注入：ask(name, args) -> ("y" | "n" | "a", 拒绝原因)
         # 第 3 课用它方便测试，第 6、7 课会换成聊天确认和无人值守的预授权
         self.ask = ask or self._ask_terminal
@@ -111,7 +130,8 @@ class PermissionManager:
             return Decision(False, reason, "policy_denied")
 
         # 第 2 关：风险分级
-        risk = TOOL_RISK.get(name, Risk.CONFIRM)
+        default_risk = Risk.SAFE if name.startswith("mcp__") and name in self.mcp_read_only else Risk.CONFIRM
+        risk = TOOL_RISK.get(name, default_risk)
         if risk is Risk.DENY:
             return Decision(False, f"工具 {name} 被策略禁用。", "policy_denied")
         if risk is Risk.SAFE or name in self.always_allowed:
@@ -126,7 +146,7 @@ class PermissionManager:
     def _hard_limits(self, name: str, args: dict) -> str | None:
         if name == "fetch_url":
             return fetch_url_denial(args.get("url", ""))
-        if name in ("read_file", "write_file", "list_dir"):
+        if name in ("read_file", "write_file", "edit_file", "list_dir", "find_files", "search_text"):
             path = args.get("path", ".")
             if self.workspace.resolve(path) is None:
                 return f"路径 {path!r} 在工作区 {self.workspace.root} 之外，禁止访问。"

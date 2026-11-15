@@ -8,9 +8,10 @@ import subprocess
 import sys
 from unittest.mock import patch
 
-from scenario_support import OfflineScenario, agent, cli, context, permissions, answer, call, tool_reply
+from scenario_support import OfflineScenario, agent, cli, context, permissions, tools, answer, call, tool_reply
 from verification import CheckResult
 from test_context import history
+from checkpoint_backend import CheckpointFixtureBackend
 
 
 class CheckpointScenarios(OfflineScenario):
@@ -47,6 +48,10 @@ class CheckpointScenarios(OfflineScenario):
             return self.agent.resume()
 
     def child(self, mode, *, limit=3):
+        if mode != 'lock':
+            # Parent and child must intentionally use the same execution backend.
+            self.tools = tools.Toolset(self.tools.workspace, backend=CheckpointFixtureBackend())
+            self.agent.tools = self.tools
         result = subprocess.run([
             sys.executable, '-B', '-X', 'utf8', str(Path(__file__).with_name('checkpoint_child.py')),
             str(Path(agent.__file__).parent), str(self.workspace), str(self.cp.directory), mode, str(limit),
@@ -174,6 +179,14 @@ class CheckpointScenarios(OfflineScenario):
                 statuses = [r['status'] for r in self.cp.load()['run_state']['call_records'].values()]
                 self.assertEqual(statuses, ['pending'] if fail_status == 'executing' else ['executing'])
                 self.assertEqual(self.cp.load()['run_state']['next_action'], 'tools')
+                if fail_status == 'recorded':
+                    request_count = len(self.all_requests)
+                    self.restart()
+                    resumed = self.resume()
+                    self.assertEqual(resumed.stop_reason, 'error')
+                    self.assertIn('未知', resumed.text)
+                    self.assertEqual(path.read_bytes(), b'effect')
+                    self.assertEqual(len(self.all_requests), request_count)
 
     def test_atomic_write_failure_preserves_snapshot_and_legacy_json(self):
         self.model([answer('候选')])
@@ -211,6 +224,25 @@ class CheckpointScenarios(OfflineScenario):
                 self.assertEqual(result.stop_reason, 'error')
                 self.assertEqual(self.agent.messages, before)
         self.cp.path.write_bytes(original)
+        self.assertEqual(len(self.all_requests), 1)
+
+    def test_resume_requires_same_selected_tool_set_but_accepts_reordered_list(self):
+        self.tools = tools.Toolset(self.tools.workspace, run_command=self.fixture_command,
+                                   enabled_tools=['read_file', 'list_dir'])
+        self.model([answer('候选')])
+        self.enable()
+        self.interrupt_after_save(lambda state: state['next_action'] == 'candidate')
+        self.interrupted_run()
+        saved = self.cp.path.read_bytes()
+        self.tools = tools.Toolset(self.tools.workspace, run_command=self.fixture_command,
+                                   enabled_tools=['list_dir'])
+        self.restart()
+        self.assertEqual(self.resume().stop_reason, 'error')
+        self.assertEqual(self.cp.path.read_bytes(), saved)
+        self.tools = tools.Toolset(self.tools.workspace, run_command=self.fixture_command,
+                                   enabled_tools=['list_dir', 'read_file'])
+        self.restart()
+        self.assertEqual(self.resume().stop_reason, 'end_turn')
         self.assertEqual(len(self.all_requests), 1)
 
     def test_incomplete_custom_verifier_is_saved_but_cannot_be_silently_removed(self):

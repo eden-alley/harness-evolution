@@ -6,6 +6,7 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 from scenario_support import OfflineScenario, tools, permissions, answer, call, tool_reply
+import sandbox
 
 
 class SandboxScenarios(OfflineScenario):
@@ -115,6 +116,57 @@ class SandboxScenarios(OfflineScenario):
                 self.assertEqual(process.communicate.call_count, 2)
                 self.assertEqual(list(self.workspace.glob(".agent-command-*.cmd")), [])
 
+    def test_bash_script_and_argv_stay_inside_sandbox(self):
+        bash = self.cli_dir / "Git" / "bin" / "bash.exe"
+        bash.parent.mkdir(parents=True)
+        bash.touch()
+        command = "printf '%s\\n' '中文 quoted' | rg 中文"
+        captured = []
+        def launch_process(argv, **options):
+            script = self.workspace / argv[-1]
+            captured.append((script.read_bytes(), options))
+            return self.process()
+        with patch.object(sandbox, "_bash_executable", return_value=bash), \
+                patch.object(subprocess, "Popen", side_effect=launch_process) as launch:
+            result = sandbox.run_in_sandbox(command, self.workspace, 2, shell="bash")
+        argv = launch.call_args.args[0]
+        self.assertEqual(argv[argv.index("--") + 1:-1], [str(bash), "--noprofile", "--norc"])
+        self.assertTrue(argv[-1].startswith("./.agent-command-"))
+        self.assertEqual(captured[0][0], (command + "\n").encode("utf-8"))
+        self.assertIn(str(bash.parent.parent / "usr" / "bin"), captured[0][1]["env"]["PATH"])
+        self.assertNotIn("OPENAI_API_KEY", captured[0][1]["env"])
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(list(self.workspace.glob(".agent-command-*.sh")), [])
+
+    def test_bash_discovery_rejects_workspace_and_unknown_shell(self):
+        with patch.dict(os.environ, {"ProgramFiles": str(self.workspace), "ProgramFiles(x86)": "", "LOCALAPPDATA": ""}), \
+                patch.object(subprocess, "Popen") as launch:
+            candidate = self.workspace / "Git" / "bin" / "bash.exe"
+            candidate.parent.mkdir(parents=True)
+            candidate.touch()
+            with self.assertRaises(RuntimeError):
+                sandbox.run_in_sandbox("echo no", self.workspace, 1, shell="bash")
+            with self.assertRaises(ValueError):
+                sandbox.run_in_sandbox("echo no", self.workspace, 1, shell="other")
+            launch.assert_not_called()
+
+    def test_bash_start_failure_and_timeout_clean_up_and_keep_output(self):
+        bash = self.cli_dir / "bash.exe"
+        for error in (OSError("missing"), subprocess.TimeoutExpired("sandbox", 1, output=b"partial", stderr=b"err"), KeyboardInterrupt()):
+            with self.subTest(error=type(error).__name__), patch.object(sandbox, "_bash_executable", return_value=bash):
+                process = self.process()
+                process.communicate.side_effect = [error, (b"partial", b"err")]
+                process.poll.return_value = None
+                with patch.object(subprocess, "Popen", side_effect=error if isinstance(error, OSError) else None, return_value=process) as launch, \
+                        patch.object(subprocess, "run"):
+                    with self.assertRaises(type(error)) as raised:
+                        sandbox.run_in_sandbox("echo no", self.workspace, 1, shell="bash")
+                    if isinstance(error, subprocess.TimeoutExpired):
+                        self.assertEqual(raised.exception.output, b"partial")
+                        self.assertEqual(raised.exception.stderr, b"err")
+                self.assertEqual(launch.call_count, 1)
+                self.assertEqual(list(self.workspace.glob(".agent-command-*.sh")), [])
+
     def test_permission_and_sandbox_failure_are_returned_to_offline_agent(self):
         asked = []
 
@@ -129,7 +181,9 @@ class SandboxScenarios(OfflineScenario):
             result, _ = self.run_agent("检查执行结果", permissions.PermissionManager(workspace=self.tools.workspace, ask=ask))
         self.assertEqual(result, "已收到拒绝和执行错误")
         self.assertEqual(asked, ["echo denied", "echo failed"])
-        self.assertEqual(launch.call_count, 1)
+        sandbox_calls = [item for item in launch.call_args_list
+                         if isinstance(item.args[0], list) and item.args[0][0] == str(self.cli)]
+        self.assertEqual(len(sandbox_calls), 1)
         outputs = {m["tool_call_id"]: m["content"] for m in self.requests[1]["messages"] if m["role"] == "tool"}
         self.assertIn("user_denied", outputs["denied"])
         self.assertIn("offline sandbox failure", outputs["failed"])

@@ -1,0 +1,126 @@
+{
+  "change": "task_progress_r1_r4",
+  "approved_scope": "默认关闭；主模型自主更新；四字段、3000 UTF-8 字节；内部记录免确认、不决定验收",
+  "real_model_requests": 0,
+  "dedicated_planning_or_judge_model_added": false,
+  "state_storage": "既有 RunState.tool_results + call_records，随原 checkpoint 保存，无新状态字段或独立存储",
+  "activation": {
+    "environment": "AGENT_TASK_PROGRESS=on|off",
+    "default": "off",
+    "programmatic": "Toolset(workspace, task_progress=True)"
+  },
+  "validation": {
+    "baseline_basic": {
+      "tests": 150,
+      "passed": 150,
+      "exit_code": 0,
+      "command": ".venv-mcp/Scripts/python.exe -B -X utf8 tests/run_offline.py",
+      "log": "2026-11-13-task-progress/baseline-offline.log"
+    },
+    "final_basic": {
+      "tests": 160,
+      "passed": 160,
+      "exit_code": 0,
+      "command": ".venv-mcp/Scripts/python.exe -B -X utf8 tests/run_offline.py",
+      "log": "2026-11-13-task-progress/final-offline.log"
+    },
+    "added_grouped_scenarios": 10,
+    "current_native": {
+      "tests": 6,
+      "passed": 4,
+      "failed": 2,
+      "skipped": 0,
+      "exit_code": 1,
+      "command": ".venv-mcp/Scripts/python.exe -B -X utf8 tests/run_offline.py --native",
+      "failures": [
+        "test_real_bash_pipeline_with_rg",
+        "test_real_registry_credential_canary_is_not_readable"
+      ],
+      "log": "2026-11-13-task-progress/native-current.log"
+    },
+    "baseline_native_controlled": {
+      "tests": 6,
+      "passed": 4,
+      "failed": 2,
+      "skipped": 0,
+      "exit_code": 1,
+      "failures": [
+        "test_real_bash_pipeline_with_rg",
+        "test_real_registry_credential_canary_is_not_readable"
+      ],
+      "method": "从改前源码副本导入测试及实现，将原生用例 ROOT 固定为实际项目路径，使写边界夹具位于系统临时目录之外；未修改测试或源码文件",
+      "log": "2026-11-13-task-progress/native-before-controlled.log"
+    },
+    "exploratory_baseline_native": {
+      "tests": 6,
+      "failed": 3,
+      "valid_comparison": false,
+      "reason": "改前副本位于系统临时目录，用例 ROOT 随副本改变；临时目录默认可写导致额外写边界失败。已用相同项目路径的受控对照复核。",
+      "log": "2026-11-13-task-progress/native-before-temp.log"
+    },
+    "tdd": "新增场景先运行，确认缺失工具/开关/预算预留；恢复完整性回归先复现，再修复并通过完整160项。"
+  },
+  "independent_review": {
+    "status": "完成；修复一项恢复完整性问题",
+    "finding": "损坏/手工编辑 checkpoint 可含无对应 call_record 的孤立结果；新进度展示与引用现在仅使用同时存在于已完成 model 调用记录和完整工具结果中的内容",
+    "regression_test": "test_recovery_ignores_orphan_progress_and_rejects_orphan_evidence",
+    "other_material_findings": []
+  },
+  "unchanged": {
+    "state_py": true,
+    "checkpoint_py": true,
+    "checkpoint_schema": true,
+    "execution_backend": true,
+    "sandbox": true,
+    "verification_py": true,
+    "existing_tests": true,
+    "bfcl_and_frozen_v0": "本次写入范围仅在当前 Agent 的指定文件和验证文档，未写入 BFCL、旧 V0"
+  },
+  "limitations": [
+    "验证证据编号存在不等于模型解释正确",
+    "模型自主选择更新时机，可能漏更新或记录过时",
+    "尚未运行真实任务对照，不能声称已减少反复调查",
+    "原有源码/工具绑定仍限制跨版本恢复，未迁移旧 checkpoint"
+  ],
+  "scope_audit": {
+    "changed_existing_files": [
+      "agent.py",
+      "cli.py",
+      "context.py",
+      "permissions.py",
+      "prompts.py",
+      "tools.py",
+      "README.md"
+    ],
+    "state_unchanged": true,
+    "checkpoint_unchanged": true,
+    "sandbox_and_execution_backend_unchanged": true,
+    "existing_test_files_unchanged": true,
+    "new_tests": "D:\\AgentLearning\\agent-minimal-loop\\tests\\test_task_progress.py",
+    "patch": "C:\\Users\\叶宸玮\\AppData\\Local\\Temp\\harness-task-progress-20261113-143033\\final.patch"
+  },
+  "recorded_at_utc": "2026-11-13T06:49:03.6363054Z",
+  "source_sha256": {
+    "models.py": "c5b35da4892f067391b11b0484b279b98a7ea363acc792bdfe7124212736c3e7",
+    "agent.py": "56c8df730df55425d4dbd4701533678263d7cc4f6d8e7cd7a227c64db925926f",
+    "token_usage.py": "226e2b67a83a015a6dd92e30f071fe6264eb79fab5249e16b08e0b6f84151bb9",
+    "sandbox.py": "3217f48e2ae40869f5c4da6574a9696f47d6ec935359b3a056e7968ba10bfb71",
+    "limits.py": "99c44642b4d1b31ae956bf5065e90f0ef9c936e060cae97b2999eac57602549e",
+    "tests/test_task_progress.py": "df5472db1b6d981e3d40d4d6246f121002cb71f9a9b11da483722ae070847048",
+    "mcp_adapter.py": "83538d7bf79386e30d0a90664c5d2e95a1cced4ea58c8f01c6594d0c6108ec8e",
+    "checkpoint.py": "0f6931d8f37fbd6028b6f1de58c864edab04a9569ea0873485f1c804987e1f7a",
+    "context.py": "a04bf4649228d142b0d58730287c5f0ea952252ca2a23999b6e03e89982a747b",
+    "mcp_notes_server.py": "a72d5d8ffe6484d592b9bf6ab04076c329e903fa40590476cf8a0d9fd7cbe4b5",
+    "prompts.py": "e242466173010402b54f5cc4cc337b778a6913fb632592a9bb305fc5efa37f20",
+    "execution_backend.py": "72db6ddd13dbd8d50fd41dd03bf6e6f5ebf3c954828b978ff34dbe3f37e86fdf",
+    "model_base.py": "f85a3caff31f92c1be90b76b1f83dd70cfc7488c0e1389f2c3e377ac02af8291",
+    "model_openai.py": "8b5ff03cb832f6b449dae1fadc63b61031ffa617e43e4c95bd46178b343fbbd6",
+    "state.py": "fb714e9cf9061c41ff0f76be1a6987b28789ef565a6cbc6792fb67283af96531",
+    "cli.py": "59a0da1639037470379a3566d97961cfaa0b76f4e4c6ad287f0cbc79be05e6a9",
+    "model_deepseek.py": "65a62aa554cf06fddbbb760072101e97e649e656ac0456551be2b37b5a673b32",
+    "README.md": "af71080b7b40e3809ff6862cd8d234155ca024737da414de69c300cd65fe51d9",
+    "permissions.py": "1fce687e3716e4860b1833a2289dffa11d5799d528c88d5782a4d4661a5ff42c",
+    "tools.py": "af0a1fabdcbfd38a140b8457a0d1e09ddb258ce79d4ef6b990daef475255f9e3",
+    "verification.py": "4ec18add9d3a242a018a84fb9072c41d9e7b8e90ee273bde6b8fac40099dbbb3"
+  }
+}

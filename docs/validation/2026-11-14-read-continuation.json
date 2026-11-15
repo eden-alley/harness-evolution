@@ -1,0 +1,149 @@
+{
+  "status": "complete_with_existing_native_failures",
+  "harness_version": "0.36",
+  "source_sha256": "00e678fb8e5723b70d0a3a2453ab77fd0275d02044d6cee27f2d23fdf61bc661",
+  "baseline_version": "0.35",
+  "baseline_source_sha256": "efdcab908e4f3005212332970880d2cc33ae44d5e73d126ca5912bd18a133ae0",
+  "scope": "第三批R1–R6：读取与续读，保留R4超长单行限制",
+  "real_model_requests": 0,
+  "runtime_restarted": false,
+  "baseline_backup": "C:\\Users\\叶宸玮\\Documents\\Codex\\2026-11-06\\new-chat-5\\outputs\\harness-v0.36-read-continuation-20261114\\before",
+  "evidence_directory": "C:\\Users\\叶宸玮\\Documents\\Codex\\2026-11-06\\new-chat-5\\outputs\\harness-v0.36-read-continuation-20261114",
+  "baseline_basic": {
+    "tests": 208,
+    "passed": 208,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0,
+    "seconds": 18.159,
+    "failure_ids": [],
+    "log": "C:\\Users\\叶宸玮\\Documents\\Codex\\2026-11-06\\new-chat-5\\outputs\\harness-v0.36-read-continuation-20261114\\baseline-host-basic.log"
+  },
+  "final_basic": {
+    "tests": 218,
+    "passed": 218,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0,
+    "seconds": 20.319,
+    "failure_ids": [],
+    "log": "C:\\Users\\叶宸玮\\Documents\\Codex\\2026-11-06\\new-chat-5\\outputs\\harness-v0.36-read-continuation-20261114\\final-basic.log"
+  },
+  "final_mcp_stdio": {
+    "tests": 4,
+    "passed": 4,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0,
+    "seconds": 6.508,
+    "failure_ids": [],
+    "log": "C:\\Users\\叶宸玮\\Documents\\Codex\\2026-11-06\\new-chat-5\\outputs\\harness-v0.36-read-continuation-20261114\\final-mcp-stdio.log"
+  },
+  "final_mcp_http": {
+    "tests": 1,
+    "passed": 1,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0,
+    "seconds": 0.834,
+    "failure_ids": [],
+    "log": "C:\\Users\\叶宸玮\\Documents\\Codex\\2026-11-06\\new-chat-5\\outputs\\harness-v0.36-read-continuation-20261114\\final-mcp-http.log"
+  },
+  "final_native": {
+    "tests": 6,
+    "passed": 4,
+    "failed": 2,
+    "errors": 0,
+    "skipped": 0,
+    "seconds": 14.916,
+    "failure_ids": [
+      "test_real_bash_pipeline_with_rg (test_sandbox_native.NativeSandboxScenarios.test_real_bash_pipeline_with_rg)",
+      "test_real_registry_credential_canary_is_not_readable (test_sandbox_native.NativeSandboxScenarios.test_real_registry_credential_canary_is_not_readable)"
+    ],
+    "log": "C:\\Users\\叶宸玮\\Documents\\Codex\\2026-11-06\\new-chat-5\\outputs\\harness-v0.36-read-continuation-20261114\\final-native.log"
+  },
+  "new_offline_test_methods": 10,
+  "coverage": [
+    "默认连续行分页及Unicode/BOM/CR-LF-CRLF重建",
+    "请求范围/EOF/空文件/越界/超小额度及完整末页",
+    "超长单行错误、提高额度恢复及4096上限仍不足",
+    "字符offset、UTF8字节预算、字段回退与假续读提示正文",
+    "execute到renderer无二次截断、仿真SDK搜索-读取-续读-修改-回查",
+    "原有权限、历史、token、轮数退出、摘要、state/checkpoint回归"
+  ],
+  "limits": {
+    "default_output_characters": 4000,
+    "max_output_tokens": 4096,
+    "explicit_utf8_bytes_per_estimated_token": 3,
+    "long_single_line_split": false,
+    "file_snapshot_across_calls": false
+  },
+  "integrity": {
+    "unchanged_runtime_modules": [
+      "agent.py",
+      "checkpoint.py",
+      "cli.py",
+      "context.py",
+      "execution_backend.py",
+      "file_edits.py",
+      "file_search.py",
+      "limits.py",
+      "mcp_adapter.py",
+      "mcp_notes_server.py",
+      "model_base.py",
+      "model_deepseek.py",
+      "model_openai.py",
+      "models.py",
+      "permissions.py",
+      "prompts.py",
+      "sandbox.py",
+      "state.py",
+      "token_usage.py",
+      "verification.py"
+    ],
+    "bfcl_and_old_v0_files": 24,
+    "frozen_fixture_files": 1,
+    "historical_version_entries_unchanged": 8,
+    "registered_source_files": 21
+  },
+  "review": {
+    "kind": "fresh read-only review",
+    "model": "gpt-6.1-sol",
+    "reasoning_effort": "high",
+    "production_must_fix_count": 0,
+    "test_helper_fix": "EOF正文中的伪续读提示不得当作元信息；新增用例RED到GREEN",
+    "additional_probe_combinations_reported_by_reviewer": 22344
+  },
+  "changed_files": [
+    "README.md",
+    "VERSION.json",
+    "docs/third-party/pi-MIT.txt",
+    "tests/test_agent_loop.py",
+    "tests/test_context.py",
+    "tests/test_context_budgeting.py",
+    "tests/test_edit_file_loop.py",
+    "tests/test_exit_check.py",
+    "tests/test_file_reads.py",
+    "tests/test_file_search.py",
+    "tests/test_models.py",
+    "tests/test_new_session.py",
+    "tests/test_output_previews.py",
+    "tests/test_search_tool_loop.py",
+    "tests/test_task_progress.py",
+    "tests/test_token_usage.py",
+    "tests/test_tool_contracts.py",
+    "tests/test_trace_and_failures.py",
+    "tools.py",
+    "docs/validation/2026-11-14-read-continuation.json"
+  ],
+  "implementation_notes": [
+    "默认读取的原结果为本页，不含未读文件尾部",
+    "结果回查增加说明行，完整JSON解析前去除说明",
+    "不为显示总行数扫描文件尾部，只探查后续字符",
+    "不存在跨调用文件快照；后续读取按当时文件内容",
+    "生产代码只修改tools.py，20个其他模块字节不变",
+    "受限启动环境的硬链接/沙箱探针失败另留日志；正常主机原基线208项通过",
+    "MCP HTTP首次错误因调用目录未含项目导入路径；修正运行目录后通过，未改测试入口或生产模块"
+  ],
+  "capability_claim": "离线验证读取与衔接；未调用真实模型，不宣称调查轮次或真实任务通过率改善。"
+}

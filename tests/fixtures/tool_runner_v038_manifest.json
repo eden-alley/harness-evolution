@@ -1,0 +1,28 @@
+{
+  "version": "v0.38",
+  "local_baseline_commit": "a942bd36258f34c7fb31f5b908587e7cbd8dffe8",
+  "source_sha256": "a168cb97b0ffd047cc96e671b8303af238514a0c944b17b23e619962a405d901",
+  "files": {
+    "agent.py": "79eab9c3b98073c01d539cb7653490b05418c9707f9b18da552195b0591520d3",
+    "checkpoint.py": "0f6931d8f37fbd6028b6f1de58c864edab04a9569ea0873485f1c804987e1f7a",
+    "cli.py": "d1b003fc203bb5e127fdc83efa10d7424cf9559f714967bc2977cb046e7b464e",
+    "context.py": "a04bf4649228d142b0d58730287c5f0ea952252ca2a23999b6e03e89982a747b",
+    "execution_backend.py": "72db6ddd13dbd8d50fd41dd03bf6e6f5ebf3c954828b978ff34dbe3f37e86fdf",
+    "file_edits.py": "7a242f8787de508347a0822d0124e1c4aeddeb29e9b6893182c1f520cd2fda7b",
+    "file_search.py": "bd863430c6668ec7daff3a1dfb470cc239eaed4f1b23f2f8686eeabb6ef69a36",
+    "limits.py": "99c44642b4d1b31ae956bf5065e90f0ef9c936e060cae97b2999eac57602549e",
+    "mcp_adapter.py": "83538d7bf79386e30d0a90664c5d2e95a1cced4ea58c8f01c6594d0c6108ec8e",
+    "mcp_notes_server.py": "a72d5d8ffe6484d592b9bf6ab04076c329e903fa40590476cf8a0d9fd7cbe4b5",
+    "model_base.py": "f85a3caff31f92c1be90b76b1f83dd70cfc7488c0e1389f2c3e377ac02af8291",
+    "model_deepseek.py": "65a62aa554cf06fddbbb760072101e97e649e656ac0456551be2b37b5a673b32",
+    "model_openai.py": "7700b17e44f86846fb0df9dfc6e711f7fba8e14e057d6143ad285382a838b55d",
+    "models.py": "c5b35da4892f067391b11b0484b279b98a7ea363acc792bdfe7124212736c3e7",
+    "permissions.py": "4c4863636a825e97d7b7c5be6ab8ba9c0a5a912d41fa6ec43949833a35fa7f96",
+    "prompts.py": "e242466173010402b54f5cc4cc337b778a6913fb632592a9bb305fc5efa37f20",
+    "sandbox.py": "3217f48e2ae40869f5c4da6574a9696f47d6ec935359b3a056e7968ba10bfb71",
+    "state.py": "fb714e9cf9061c41ff0f76be1a6987b28789ef565a6cbc6792fb67283af96531",
+    "token_usage.py": "226e2b67a83a015a6dd92e30f071fe6264eb79fab5249e16b08e0b6f84151bb9",
+    "tools.py": "23013d9e8a04e26db687a50300fec6e8d4a0041ef3b24bd4d38a036a2b2594de",
+    "verification.py": "4ec18add9d3a242a018a84fb9072c41d9e7b8e90ee273bde6b8fac40099dbbb3"
+  }
+}

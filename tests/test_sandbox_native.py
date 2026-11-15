@@ -2,16 +2,18 @@
 import os
 from pathlib import Path
 import re
+import shutil
 import socket
 import subprocess
 import sys
 import tempfile
 import time
 import unittest
+from uuid import uuid4
 from unittest.mock import patch
 
 from scenario_support import OfflineScenario, ROOT, permissions, tools
-from sandbox import _codex_executable
+from sandbox import _codex_executable, _bash_executable, run_in_sandbox
 
 
 @unittest.skipUnless(os.name == "nt", "真实沙箱验收只适用于 Windows")
@@ -34,7 +36,7 @@ class NativeSandboxScenarios(OfflineScenario):
             self.skipTest(str(error))
 
     def python_command(self, code):
-        return subprocess.list2cmdline([sys.executable, "-c", code])
+        return subprocess.list2cmdline([sys.executable, "-B", "-c", f"exec({code!r})"])
 
     def test_real_write_boundary_read_scope_and_environment(self):
         code = ("import os; from pathlib import Path; "
@@ -62,11 +64,30 @@ class NativeSandboxScenarios(OfflineScenario):
         self.assertEqual(list(self.workspace.glob(".agent-command-*.cmd")), [])
         self.assertEqual(self.all_requests, [])
 
+    def test_real_bash_pipeline_with_rg(self):
+        try:
+            _bash_executable(self.workspace)
+        except RuntimeError as error:
+            self.skipTest(str(error))
+        if not shutil.which("rg"):
+            self.skipTest("rg 不在 PATH 中")
+        result = run_in_sandbox("printf 'alpha\\nbeta\\n' | rg beta", self.workspace, 20, shell="bash")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), b"beta")
+        self.assertEqual(list(self.workspace.glob(".agent-command-*.sh")), [])
+        self.assertEqual(self.all_requests, [])
+
     def test_real_direct_network_connection_to_local_listener_is_blocked(self):
         with socket.socket() as listener:
             listener.bind(("127.0.0.1", 0))
             listener.listen(1)
             port = listener.getsockname()[1]
+            # Positive control: the endpoint must be reachable on the host.
+            with socket.socket() as control:
+                control.settimeout(1)
+                self.assertEqual(control.connect_ex(("127.0.0.1", port)), 0)
+            connection, _ = listener.accept()
+            connection.close()
             command = self.python_command(
                 "import socket; s=socket.socket(); s.settimeout(1); "
                 f"print('CONNECT_ERR=' + str(s.connect_ex(('127.0.0.1', {port})))); s.close()")
@@ -76,6 +97,56 @@ class NativeSandboxScenarios(OfflineScenario):
         match = re.search(r"CONNECT_ERR=(\d+)", result.data)
         self.assertIsNotNone(match, result)
         self.assertNotEqual(int(match[1]), 0, "当前离线工作区配置不应连接本地监听端口")
+        self.assertEqual(self.all_requests, [])
+
+    def test_real_udp_to_local_listener_is_blocked(self):
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as listener:
+            listener.bind(("127.0.0.1", 0))
+            listener.settimeout(0.5)
+            address = listener.getsockname()
+            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as control:
+                control.sendto(b'host-control', address)
+            self.assertEqual(listener.recvfrom(100)[0], b'host-control')
+            code = ("import socket\n"
+                    "s=socket.socket(socket.AF_INET, socket.SOCK_DGRAM)\n"
+                    "try:\n"
+                    f"    s.sendto(b'sandbox-canary', {address!r})\n"
+                    "    print('UDP_SEND_ACCEPTED')\n"
+                    "except OSError as e:\n"
+                    "    print('UDP_BLOCKED=' + str(e.winerror))\n"
+                    "finally:\n"
+                    "    s.close()\n")
+            result = tools.run_shell(self.tools, self.python_command(code))
+            self.assertTrue(result.ok, result)
+            # A blocked datagram can be silently dropped; delivery is the boundary.
+            self.assertRegex(result.data, r'UDP_(BLOCKED=\d+|SEND_ACCEPTED)')
+            with self.assertRaises(socket.timeout):
+                listener.recvfrom(100)
+        self.assertEqual(self.all_requests, [])
+
+    def test_real_registry_credential_canary_is_not_readable(self):
+        # Security requirement, not a test that approves an observed leak.
+        # Only create/read/delete our unique synthetic value, never real keys.
+        import winreg
+        name = 'HARNESS_CANARY_' + uuid4().hex
+        canary = 'synthetic-' + uuid4().hex
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, 'Environment', 0,
+                            winreg.KEY_SET_VALUE) as key:
+            winreg.SetValueEx(key, name, 0, winreg.REG_SZ, canary)
+            try:
+                code = ("import winreg\n"
+                        "try:\n"
+                        "    with winreg.OpenKey(winreg.HKEY_CURRENT_USER, 'Environment') as key:\n"
+                        f"        value = winreg.QueryValueEx(key, {name!r})[0]\n"
+                        f"    print('REGISTRY_CANARY_READABLE=' + str(value == {canary!r}))\n"
+                        "except OSError:\n"
+                        "    print('REGISTRY_CANARY_READABLE=False')\n")
+                result = tools.run_shell(self.tools, self.python_command(code))
+            finally:
+                winreg.DeleteValue(key, name)
+        self.assertTrue(result.ok, result)
+        self.assertIn('REGISTRY_CANARY_READABLE=False', result.data,
+                      'MXC can read persistent user credentials; isolation requirement unmet')
         self.assertEqual(self.all_requests, [])
 
     def test_real_timeout_stops_child_process_before_followup_file_write(self):

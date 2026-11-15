@@ -1,0 +1,148 @@
+{
+  "status": "complete_with_existing_native_failures",
+  "harness_version": "0.38",
+  "source_sha256": "a168cb97b0ffd047cc96e671b8303af238514a0c944b17b23e619962a405d901",
+  "baseline_version": "0.37",
+  "baseline_source_sha256": "270b07712be7b5a44b71e1f6106ea1db468b1e79fbe8d52922e936fdce728884",
+  "scope": "第五批R1–R7：统一工具配置；允许空名单；保留MCP连接策略",
+  "real_model_requests": 0,
+  "runtime_restarted": false,
+  "baseline_backup": "C:\\Users\\叶宸玮\\Documents\\Codex\\2026-11-06\\new-chat-5\\outputs\\harness-v0.38-tool-config-20261114\\before",
+  "evidence_directory": "C:\\Users\\叶宸玮\\Documents\\Codex\\2026-11-06\\new-chat-5\\outputs\\harness-v0.38-tool-config-20261114",
+  "baseline_basic": {
+    "tests": 231,
+    "passed": 231,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0,
+    "seconds": 20.895,
+    "failure_ids": [],
+    "log": "C:\\Users\\叶宸玮\\Documents\\Codex\\2026-11-06\\new-chat-5\\outputs\\harness-v0.38-tool-config-20261114\\baseline-basic.log"
+  },
+  "final_basic": {
+    "tests": 248,
+    "passed": 248,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0,
+    "seconds": 21.017,
+    "failure_ids": [],
+    "log": "C:\\Users\\叶宸玮\\Documents\\Codex\\2026-11-06\\new-chat-5\\outputs\\harness-v0.38-tool-config-20261114\\final-basic.log"
+  },
+  "final_mcp_stdio": {
+    "tests": 4,
+    "passed": 4,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0,
+    "seconds": 5.699,
+    "failure_ids": [],
+    "log": "C:\\Users\\叶宸玮\\Documents\\Codex\\2026-11-06\\new-chat-5\\outputs\\harness-v0.38-tool-config-20261114\\final-mcp-stdio.log"
+  },
+  "final_mcp_http": {
+    "tests": 1,
+    "passed": 1,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0,
+    "seconds": 1.345,
+    "failure_ids": [],
+    "log": "C:\\Users\\叶宸玮\\Documents\\Codex\\2026-11-06\\new-chat-5\\outputs\\harness-v0.38-tool-config-20261114\\final-mcp-http.log"
+  },
+  "final_native": {
+    "tests": 6,
+    "passed": 4,
+    "failed": 2,
+    "errors": 0,
+    "skipped": 0,
+    "seconds": 15.015,
+    "failure_ids": [
+      "test_real_bash_pipeline_with_rg (test_sandbox_native.NativeSandboxScenarios.test_real_bash_pipeline_with_rg)",
+      "test_real_registry_credential_canary_is_not_readable (test_sandbox_native.NativeSandboxScenarios.test_real_registry_credential_canary_is_not_readable)"
+    ],
+    "log": "C:\\Users\\叶宸玮\\Documents\\Codex\\2026-11-06\\new-chat-5\\outputs\\harness-v0.38-tool-config-20261114\\final-native.log"
+  },
+  "new_offline_test_methods": 17,
+  "coverage": [
+    "默认集合/顺序、显式名单复制/实例隔离及严格配置校验",
+    "禁用工具在schema/validate/execute/execution_info一致且不进权限或handler",
+    "空名单省略工具字段；意外调用协议错误、usage保留；非空未知工具回馈继续",
+    "rg启动缺失拒绝及运行期间消失动态撤下；进度工具与指导同步",
+    "CLI JSON环境解析/模型密钥读取前校验、启动传参、只读tools命令",
+    "MCP全局名单交集不能扩大allow_tools；空名单仍保持连接生命周期",
+    "同集合重排的binding一致、不同集合拒绝恢复、命令验收不能绕过禁shell",
+    "条件式恢复提示不改任务原文；旧基础/文件/权限/状态/恢复全面回归"
+  ],
+  "configuration": {
+    "environment": "AGENT_TOOLS",
+    "programmatic": "Toolset(enabled_tools=None)",
+    "format": "JSON exact-name array",
+    "unset": "existing defaults",
+    "empty": "no tools",
+    "scope": "native and loaded MCP aliases",
+    "runtime_reload": false,
+    "mcp_connection_policy_changed": false,
+    "permissions_or_sandbox_changed": false
+  },
+  "integrity": {
+    "unchanged_runtime_modules": [
+      "checkpoint.py",
+      "context.py",
+      "execution_backend.py",
+      "file_edits.py",
+      "limits.py",
+      "mcp_adapter.py",
+      "mcp_notes_server.py",
+      "model_base.py",
+      "model_deepseek.py",
+      "models.py",
+      "permissions.py",
+      "prompts.py",
+      "sandbox.py",
+      "state.py",
+      "token_usage.py",
+      "verification.py"
+    ],
+    "bfcl_and_old_v0_files": 24,
+    "frozen_fixture_files": 1,
+    "historical_version_entries_unchanged": 10,
+    "registered_source_files": 21
+  },
+  "review": {
+    "kind": "fresh read-only review",
+    "model": "gpt-6.1-sol",
+    "reasoning_effort": "high",
+    "must_fix_count": 1,
+    "fixed": [
+      "关闭工具收到非对象参数时优先返回tool_unavailable；RED到GREEN覆盖None/列表/字符串"
+    ],
+    "additional_mock_probes": [
+      "默认registry/schema顺序",
+      "空名单省略tools且意外调用保留usage",
+      "关闭工具不进入权限"
+    ],
+    "outcome": "已修正唯一返回码边缘，未发现其他必须修复问题"
+  },
+  "changed_files": [
+    "README.md",
+    "VERSION.json",
+    "agent.py",
+    "cli.py",
+    "docs/third-party/pi-MIT.txt",
+    "file_search.py",
+    "model_openai.py",
+    "tests/test_checkpoints.py",
+    "tests/test_models.py",
+    "tests/test_tool_config.py",
+    "tools.py",
+    "docs/validation/2026-11-14-tool-config.json"
+  ],
+  "retained_boundaries": [
+    "工具选择不替代权限或沙箱，run_shell/MCP仍可有副作用",
+    "MCP连接及其配置准入不因工具名单空而跳过",
+    "禁用恢复工具或命令可能使任务或验收无法完成，不自动补工具",
+    "沿用源码/工具/MCP严格绑定，不承诺旧版本检查点直接恢复",
+    "空工具上下文估算仍计入空tools JSON，约4token保守高估，真实usage不受影响"
+  ],
+  "capability_claim": "离线验证工具配置一致性与衔接；未调用真实模型，不宣称真实任务能力或通过率改善。"
+}

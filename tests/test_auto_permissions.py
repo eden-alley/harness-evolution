@@ -136,7 +136,7 @@ class AutoPermissionScenarios(OfflineScenario):
         self.assertFalse((self.workspace.parent / "outside.txt").exists())
         sandbox_run.assert_called_once_with("echo auto-shell-ok", self.workspace, 30)
         outputs = {m["tool_call_id"]: m["content"] for m in self.requests[1]["messages"] if m["role"] == "tool"}
-        self.assertIn("已写入", outputs["write"])
+        self.assertEqual(json.loads(outputs["write"])["data"]["operation"], "created")
         self.assertEqual(tool_text(outputs["shell"]).splitlines(), ["[exit 0]", "auto-shell-ok"])
         self.assertEqual(tool_text(outputs["fetch"]), "本地网页样本")
         self.assertEqual(json.loads(outputs["escape"])["code"], "policy_denied")

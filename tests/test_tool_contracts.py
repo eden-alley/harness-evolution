@@ -161,9 +161,9 @@ class ToolContractScenarios(OfflineScenario):
         self.assertEqual(self.agent.run_state.steps_used, 2)
         outputs = [json.loads(m["content"]) for m in self.requests[1]["messages"] if m["role"] == "tool"]
         self.assertEqual([item["ok"] for item in outputs], [True, True, True])
-        self.assertEqual([item["data"] for item in outputs][::2], ["(空目录)", ""])
+        self.assertEqual([item["data"] for item in outputs][::2], ["(空目录)", "[空文件；文件已读完]"])
         self.assertTrue(all("result_contract" not in item for item in outputs))
         direct = tools.read_file(self.tools, "empty.txt")
         self.assertIsInstance(direct, tools.ToolResult)
-        self.assertEqual(direct.data, "")
+        self.assertEqual(direct.data, "[空文件；文件已读完]")
 

@@ -21,7 +21,7 @@ def flatten(suite):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--native", action="store_true", help="单独运行三项真实 Windows 沙箱验收")
+    parser.add_argument("--native", action="store_true", help="单独运行真实 Windows 沙箱边界与兼容性验收")
     native = parser.parse_args().native
     tests = flatten(unittest.defaultTestLoader.discover(str(ROOT / "tests")))
     selected = [test for test in tests if ("test_sandbox_native." in test.id()) == native]

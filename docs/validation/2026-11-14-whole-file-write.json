@@ -1,0 +1,141 @@
+{
+  "status": "complete_with_existing_native_failures",
+  "harness_version": "0.37",
+  "source_sha256": "270b07712be7b5a44b71e1f6106ea1db468b1e79fbe8d52922e936fdce728884",
+  "baseline_version": "0.36",
+  "baseline_source_sha256": "00e678fb8e5723b70d0a3a2453ab77fd0275d02044d6cee27f2d23fdf61bc661",
+  "scope": "第四批R1–R7：整文件可靠写入；保留R3并发边界；本批验收Windows",
+  "real_model_requests": 0,
+  "runtime_restarted": false,
+  "baseline_backup": "C:\\Users\\叶宸玮\\Documents\\Codex\\2026-11-06\\new-chat-5\\outputs\\harness-v0.37-whole-file-write-20261114\\before",
+  "evidence_directory": "C:\\Users\\叶宸玮\\Documents\\Codex\\2026-11-06\\new-chat-5\\outputs\\harness-v0.37-whole-file-write-20261114",
+  "baseline_basic": {
+    "tests": 218,
+    "passed": 218,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0,
+    "seconds": 19.115,
+    "failure_ids": [],
+    "log": "C:\\Users\\叶宸玮\\Documents\\Codex\\2026-11-06\\new-chat-5\\outputs\\harness-v0.37-whole-file-write-20261114\\baseline-basic.log"
+  },
+  "final_basic": {
+    "tests": 231,
+    "passed": 231,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0,
+    "seconds": 20.177,
+    "failure_ids": [],
+    "log": "C:\\Users\\叶宸玮\\Documents\\Codex\\2026-11-06\\new-chat-5\\outputs\\harness-v0.37-whole-file-write-20261114\\final-basic.log"
+  },
+  "final_mcp_stdio": {
+    "tests": 4,
+    "passed": 4,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0,
+    "seconds": 6.293,
+    "failure_ids": [],
+    "log": "C:\\Users\\叶宸玮\\Documents\\Codex\\2026-11-06\\new-chat-5\\outputs\\harness-v0.37-whole-file-write-20261114\\final-mcp-stdio.log"
+  },
+  "final_mcp_http": {
+    "tests": 1,
+    "passed": 1,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0,
+    "seconds": 0.846,
+    "failure_ids": [],
+    "log": "C:\\Users\\叶宸玮\\Documents\\Codex\\2026-11-06\\new-chat-5\\outputs\\harness-v0.37-whole-file-write-20261114\\final-mcp-http.log"
+  },
+  "final_native": {
+    "tests": 6,
+    "passed": 4,
+    "failed": 2,
+    "errors": 0,
+    "skipped": 0,
+    "seconds": 14.878,
+    "failure_ids": [
+      "test_real_bash_pipeline_with_rg (test_sandbox_native.NativeSandboxScenarios.test_real_bash_pipeline_with_rg)",
+      "test_real_registry_credential_canary_is_not_readable (test_sandbox_native.NativeSandboxScenarios.test_real_registry_credential_canary_is_not_readable)"
+    ],
+    "log": "C:\\Users\\叶宸玮\\Documents\\Codex\\2026-11-06\\new-chat-5\\outputs\\harness-v0.37-whole-file-write-20261114\\final-native.log"
+  },
+  "new_offline_test_methods": 13,
+  "coverage": [
+    "创建/替换/unchanged回执与UTF8/BOM/CR-LF-CRLF/NUL精确字节",
+    "编码与大小检查先于mkdir；原文件与结果20MiB上限",
+    "部分写入/flush/fsync/replace失败保留目标及自有temp清理",
+    "Windows新建rename失败及目标抢先创建不得覆盖",
+    "目标/暂存文件变化、只读/硬链接/owner-DACL/ADS拒绝",
+    "仿真SDK创建-读取-整写-结果回查，权限/token/轮数不变",
+    "写后checkpoint记录失败，恢复后不重放；原edit15项回归"
+  ],
+  "limits": {
+    "file_bytes": 20971520,
+    "safe_create_validated_platform": "Windows",
+    "other_platform_safe_create": "unsupported_platform",
+    "cross_call_version_precondition": false,
+    "last_check_publish_race_removed": false,
+    "exactly_once_disk_checkpoint_transaction": false
+  },
+  "integrity": {
+    "unchanged_runtime_modules": [
+      "agent.py",
+      "checkpoint.py",
+      "cli.py",
+      "context.py",
+      "execution_backend.py",
+      "file_search.py",
+      "limits.py",
+      "mcp_adapter.py",
+      "mcp_notes_server.py",
+      "model_base.py",
+      "model_deepseek.py",
+      "model_openai.py",
+      "models.py",
+      "permissions.py",
+      "prompts.py",
+      "sandbox.py",
+      "state.py",
+      "token_usage.py",
+      "verification.py"
+    ],
+    "bfcl_and_old_v0_files": 24,
+    "frozen_fixture_files": 1,
+    "historical_version_entries_unchanged": 9,
+    "registered_source_files": 21
+  },
+  "review": {
+    "kind": "fresh read-only review",
+    "model": "gpt-6.1-sol",
+    "reasoning_effort": "high",
+    "must_fix_count": 0,
+    "additional_mock_probes": [
+      "fdopen失败关闭FD及清理",
+      "短写拒绝发布并清理"
+    ],
+    "outcome": "未发现阻止发布的问题；edit匹配/换行映射/diff字节不变"
+  },
+  "changed_files": [
+    "README.md",
+    "VERSION.json",
+    "docs/third-party/pi-MIT.txt",
+    "file_edits.py",
+    "tests/test_auto_permissions.py",
+    "tests/test_checkpoints.py",
+    "tests/test_file_writes.py",
+    "tests/test_task_progress.py",
+    "tools.py",
+    "docs/validation/2026-11-14-whole-file-write.json"
+  ],
+  "retained_boundaries": [
+    "不保护工具开始前的陈旧整文，不消除最后检查到替换的窗口",
+    "只保证本批Windows验收，不切换执行环境",
+    "新建父目录可能在失败后保留，强制中断或清理失败可能残留自有temp",
+    "sha256描述本次发布内容，不承诺随后未被外部修改",
+    "沿用未知执行不重放，不提供断电恢复/跨文件事务"
+  ],
+  "capability_claim": "离线验证可靠写入与衔接；未调用真实模型，不宣称真实任务能力或通过率改善。"
+}

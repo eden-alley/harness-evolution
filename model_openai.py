@@ -77,10 +77,10 @@ class OpenAIChatModel:
         if self.client is None:
             raise ValueError('模型客户端尚未配置')
         payload = {'model': self.config.model_name, 'messages': deepcopy(messages)}
-        if tools is not None:
+        if tools:
             payload['tools'] = deepcopy(tools)
         payload.update(self._request_options())
         # 不捕获传输/预算/取消异常，不额外重试；沿用注入客户端的配置。
         response = self.client.chat.completions.create(**payload)
         raw = response.model_dump(mode='json', exclude_none=True, warnings=False)
-        return normalize_response(raw, tools_allowed=tools is not None)
+        return normalize_response(raw, tools_allowed=bool(tools))

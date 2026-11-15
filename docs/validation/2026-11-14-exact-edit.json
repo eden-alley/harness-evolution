@@ -1,0 +1,148 @@
+{
+  "status": "complete_with_existing_native_failures",
+  "harness_version": "0.34",
+  "source_sha256": "9c8c999cb38d699281945a77c66a12207fc5bdd5e5c09aaf70a3f36602063b5e",
+  "scope": "第一批 R1–R7：仅新增单文件精确修改工具，复用权限、原始结果记录、state 与 checkpoint",
+  "real_model_requests": 0,
+  "runtime_restarted": false,
+  "baseline_version": "0.33",
+  "baseline_source_sha256": "809ca4974bd8a984906fe2ca40f48851804288fc738ed442aae1b34ca73525a9",
+  "baseline_backup": "C:\\Users\\叶宸玮\\Documents\\Codex\\2026-11-06\\new-chat-5\\outputs\\harness-v0.34-exact-edit-20261114\\before",
+  "evidence_directory": "C:\\Users\\叶宸玮\\Documents\\Codex\\2026-11-06\\new-chat-5\\outputs\\harness-v0.34-exact-edit-20261114",
+  "baseline_basic": {
+    "tests": 162,
+    "passed": 162,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0,
+    "seconds": 10.698,
+    "failure_ids": [],
+    "log": "C:\\Users\\叶宸玮\\Documents\\Codex\\2026-11-06\\new-chat-5\\outputs\\harness-v0.34-exact-edit-20261114\\baseline-basic.log"
+  },
+  "new_offline_test_methods": 22,
+  "final_basic": {
+    "tests": 184,
+    "passed": 184,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0,
+    "seconds": 10.219,
+    "failure_ids": [],
+    "log": "C:\\Users\\叶宸玮\\Documents\\Codex\\2026-11-06\\new-chat-5\\outputs\\harness-v0.34-exact-edit-20261114\\final-basic.log"
+  },
+  "final_mcp_stdio": {
+    "tests": 4,
+    "passed": 4,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0,
+    "seconds": 5.456,
+    "failure_ids": [],
+    "log": "C:\\Users\\叶宸玮\\Documents\\Codex\\2026-11-06\\new-chat-5\\outputs\\harness-v0.34-exact-edit-20261114\\final-mcp-stdio.log"
+  },
+  "final_mcp_http": {
+    "tests": 1,
+    "passed": 1,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0,
+    "seconds": 0.742,
+    "failure_ids": [],
+    "log": "C:\\Users\\叶宸玮\\Documents\\Codex\\2026-11-06\\new-chat-5\\outputs\\harness-v0.34-exact-edit-20261114\\final-mcp-http.log"
+  },
+  "final_native": {
+    "tests": 6,
+    "passed": 4,
+    "failed": 2,
+    "errors": 0,
+    "skipped": 0,
+    "seconds": 14.644,
+    "failure_ids": [
+      "test_real_bash_pipeline_with_rg (test_sandbox_native.NativeSandboxScenarios.test_real_bash_pipeline_with_rg)",
+      "test_real_registry_credential_canary_is_not_readable (test_sandbox_native.NativeSandboxScenarios.test_real_registry_credential_canary_is_not_readable)"
+    ],
+    "log": "C:\\Users\\叶宸玮\\Documents\\Codex\\2026-11-06\\new-chat-5\\outputs\\harness-v0.34-exact-edit-20261114\\final-native.log"
+  },
+  "new_test_coverage": [
+    "完整最终字节、UTF8/BOM/混合CRLF-LF-CR和末尾无换行",
+    "所有替换基于原文件、唯一性、重叠/歧义/模糊匹配拒绝",
+    "删除、无变化、编码和修改前后大小上限、20处编辑",
+    "差异独立重放、大量重复行的局部差异",
+    "临时部分写入/fsync/替换失败及源文件/临时文件外部修改",
+    "只读、硬链接、自定义DACL、附加数据流拒绝保留原内容",
+    "参数先校验、嵌套参数不可被确认改写、独立会话授权、自动模式硬边界",
+    "真实SDK本地MockTransport、完整差异找回、token/轮次/退出不变",
+    "硬退出后未知执行状态拒绝重放、根目录Python快照独立加载"
+  ],
+  "integrity": {
+    "unchanged_runtime_modules": [
+      "agent.py",
+      "checkpoint.py",
+      "cli.py",
+      "context.py",
+      "execution_backend.py",
+      "limits.py",
+      "mcp_adapter.py",
+      "mcp_notes_server.py",
+      "models.py",
+      "model_base.py",
+      "model_deepseek.py",
+      "model_openai.py",
+      "prompts.py",
+      "sandbox.py",
+      "state.py",
+      "token_usage.py",
+      "verification.py"
+    ],
+    "bfcl_and_old_v0_files": 24,
+    "frozen_fixture_files": 1,
+    "old_version_entries_unchanged": 6,
+    "registered_source_files": 20
+  },
+  "review": {
+    "kind": "fresh read-only review",
+    "model": "gpt-6.1-sol",
+    "reasoning_effort": "high",
+    "findings": [
+      {
+        "severity": "P2",
+        "issue": "Mixed lone CR used a later LF/CRLF style",
+        "resolution": "Two regression subcases RED→GREEN; choose the actual local CR/LF/CRLF ending"
+      }
+    ],
+    "author_followup": "Reproduced alternate-data-stream loss; added RED→GREEN rejection test and owner/DACL equality guard within ordinary-file scope.",
+    "reviewer_reported_extra_probes": {
+      "random_diff_replays": 2961,
+      "failures": 0,
+      "shared_suite_runs": 0
+    },
+    "remaining_minor_findings": [],
+    "retained_boundaries": [
+      "No external compare-and-swap or cross-file transaction",
+      "Existing state/checkpoint internals unchanged",
+      "Custom SACL/auditing metadata preservation outside supported ordinary-file scope"
+    ]
+  },
+  "changed_files": [
+    "README.md",
+    "VERSION.json",
+    "docs/third-party/pi-MIT.txt",
+    "docs/validation/2026-11-14-exact-edit.json",
+    "file_edits.py",
+    "permissions.py",
+    "tests/edit_checkpoint_child.py",
+    "tests/test_agent_loop.py",
+    "tests/test_edit_file_loop.py",
+    "tests/test_file_edits.py",
+    "tests/test_task_progress.py",
+    "tools.py"
+  ],
+  "limits": {
+    "file_bytes_before_and_after": 20971520,
+    "edits_per_call": 20,
+    "matching": "exact except newline normalization",
+    "encoding": "UTF-8 with optional BOM",
+    "operation": "single ordinary file, no cross-file transaction"
+  },
+  "capability_claim": "离线测试验证工具与原功能的程序行为；未进行真实模型任务对照，不宣称任务通过率或调查轮次已有改善。"
+}

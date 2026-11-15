@@ -1,0 +1,129 @@
+{
+  "status": "complete",
+  "harness_version": "0.33",
+  "source_sha256": "809ca4974bd8a984906fe2ca40f48851804288fc738ed442aae1b34ca73525a9",
+  "scope": "只取消每轮额外进度卡；保留默认关闭的可选工具、固定指导语、原有摘要/恢复和版本绑定",
+  "real_model_requests": 0,
+  "backup": "C:\\Users\\叶宸玮\\Documents\\Codex\\2026-11-06\\new-chat-5\\outputs\\harness-v0.33-progress-card-removal-20261114\\v0.32",
+  "evidence_directory": "C:\\Users\\叶宸玮\\Documents\\Codex\\2026-11-06\\new-chat-5\\outputs\\harness-v0.33-progress-card-removal-20261114",
+  "baseline_basic": {
+    "tests": 162,
+    "passed": 162,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0,
+    "seconds": 9.267,
+    "failure_ids": [],
+    "log": "C:\\Users\\叶宸玮\\Documents\\Codex\\2026-11-06\\new-chat-5\\outputs\\harness-v0.33-progress-card-removal-20261114\\baseline-offline.log"
+  },
+  "baseline_native": {
+    "tests": 6,
+    "passed": 4,
+    "failed": 2,
+    "errors": 0,
+    "skipped": 0,
+    "seconds": 14.188,
+    "failure_ids": [
+      "test_real_bash_pipeline_with_rg",
+      "test_real_registry_credential_canary_is_not_readable"
+    ],
+    "log": "C:\\Users\\叶宸玮\\Documents\\Codex\\2026-11-06\\new-chat-5\\outputs\\harness-v0.33-progress-card-removal-20261114\\baseline-native.log"
+  },
+  "tdd": {
+    "red": {
+      "tests": 12,
+      "failures": 8,
+      "errors": 0,
+      "log": "red-task-progress.log"
+    },
+    "green": {
+      "tests": 12,
+      "passed": 12,
+      "log": "green-task-progress.log"
+    }
+  },
+  "final_basic": {
+    "tests": 162,
+    "passed": 162,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0,
+    "seconds": 6.969,
+    "failure_ids": [],
+    "log": "C:\\Users\\叶宸玮\\Documents\\Codex\\2026-11-06\\new-chat-5\\outputs\\harness-v0.33-progress-card-removal-20261114\\final-offline.log"
+  },
+  "final_mcp": {
+    "tests": 5,
+    "passed": 5,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0,
+    "seconds": 5.231,
+    "failure_ids": [],
+    "log": "C:\\Users\\叶宸玮\\Documents\\Codex\\2026-11-06\\new-chat-5\\outputs\\harness-v0.33-progress-card-removal-20261114\\final-mcp.log"
+  },
+  "final_native": {
+    "tests": 6,
+    "passed": 4,
+    "failed": 2,
+    "errors": 0,
+    "skipped": 0,
+    "seconds": 13.688,
+    "failure_ids": [
+      "test_real_bash_pipeline_with_rg",
+      "test_real_registry_credential_canary_is_not_readable"
+    ],
+    "log": "C:\\Users\\叶宸玮\\Documents\\Codex\\2026-11-06\\new-chat-5\\outputs\\harness-v0.33-progress-card-removal-20261114\\final-native.log"
+  },
+  "independent_review": {
+    "reviewer": "gpt-6.1-sol/high",
+    "read_only": true,
+    "critical": 0,
+    "important": 0,
+    "minor": 0,
+    "conclusion": "未发现本次改动引入的问题；产品源码差异只取消额外进度卡，固定指导语和原有记录/摘要/恢复机制保持。",
+    "scope_limits": [
+      "不承诺摘要后完整笔记每轮可见，这是已批准的取舍。",
+      "read_tool_result不是来源认证器，本次不改变既有孤立结果处理。",
+      "无verifier时的原退出行为保持不变。",
+      "原生沙箱既有两项失败仍然存在，不宣称原生隔离验收通过。"
+    ]
+  },
+  "verified_at_utc": "2026-11-14T07:16:11.888473+00:00",
+  "native_result": "改前改后同两项失败，无新增失败；原生验收未全通过。",
+  "unchanged_checks": {
+    "unchanged_product_python_files": [
+      "checkpoint.py",
+      "cli.py",
+      "context.py",
+      "execution_backend.py",
+      "limits.py",
+      "mcp_adapter.py",
+      "mcp_notes_server.py",
+      "model_base.py",
+      "model_deepseek.py",
+      "model_openai.py",
+      "models.py",
+      "permissions.py",
+      "prompts.py",
+      "sandbox.py",
+      "state.py",
+      "token_usage.py",
+      "tools.py",
+      "verification.py"
+    ],
+    "bfcl_and_old_v0_files": 24,
+    "frozen_fixture_files": 1,
+    "old_version_entries": 5,
+    "backup_hashes_match": true
+  },
+  "changed_files": [
+    "agent.py",
+    "VERSION.json",
+    "README.md",
+    "tests/test_task_progress.py",
+    "docs/validation/2026-11-14-progress-card-removal.json"
+  ],
+  "runtime_restarted": false,
+  "capability_claim": "离线验证程序行为；未进行真实模型任务评测，不宣称交付能力改善。"
+}

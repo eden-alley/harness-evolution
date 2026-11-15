@@ -1,0 +1,272 @@
+{
+  "status": "complete_with_existing_native_failures",
+  "harness_version": "0.39",
+  "theme": "Tool Execution Extraction",
+  "source_sha256": "a2e8d93bb0b9c2431b0fb6ce4d2e3d40f7a6e9de6920ec3fd9c06308a9877f52",
+  "baseline_version": "0.38",
+  "baseline_source_sha256": "a168cb97b0ffd047cc96e671b8303af238514a0c944b17b23e619962a405d901",
+  "local_baseline_commit": "a942bd36258f34c7fb31f5b908587e7cbd8dffe8",
+  "github_main_at_review": "b77a3263510919ba1806562e88e4ad60a39a95e8",
+  "baseline_commit_is_github": false,
+  "baseline_backup": "C:\\Users\\叶宸玮\\Documents\\Codex\\2026-11-06\\new-chat-5\\outputs\\harness-v0.39-tool-extraction-20261115\\before",
+  "evidence_directory": "C:\\Users\\叶宸玮\\Documents\\Codex\\2026-11-06\\new-chat-5\\outputs\\harness-v0.39-tool-extraction-20261115",
+  "real_model_requests": 0,
+  "runtime_restarted": false,
+  "real_user_checkpoints_modified": false,
+  "baseline_basic": {
+    "tests": 248,
+    "passed": 248,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0,
+    "seconds": 21.418,
+    "failure_ids": [],
+    "log": "C:\\Users\\叶宸玮\\Documents\\Codex\\2026-11-06\\new-chat-5\\outputs\\harness-v0.39-tool-extraction-20261115\\baseline-basic.log"
+  },
+  "final_basic": {
+    "tests": 262,
+    "passed": 262,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0,
+    "seconds": 26.884,
+    "failure_ids": [],
+    "log": "C:\\Users\\叶宸玮\\Documents\\Codex\\2026-11-06\\new-chat-5\\outputs\\harness-v0.39-tool-extraction-20261115\\final-basic.log"
+  },
+  "final_mcp_stdio": {
+    "tests": 4,
+    "passed": 4,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0,
+    "seconds": 5.506,
+    "failure_ids": [],
+    "log": "C:\\Users\\叶宸玮\\Documents\\Codex\\2026-11-06\\new-chat-5\\outputs\\harness-v0.39-tool-extraction-20261115\\final-mcp-stdio.log"
+  },
+  "final_mcp_http": {
+    "tests": 1,
+    "passed": 1,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0,
+    "seconds": 1.245,
+    "failure_ids": [],
+    "log": "C:\\Users\\叶宸玮\\Documents\\Codex\\2026-11-06\\new-chat-5\\outputs\\harness-v0.39-tool-extraction-20261115\\final-mcp-http.log"
+  },
+  "final_native": {
+    "tests": 6,
+    "passed": 4,
+    "failed": 2,
+    "errors": 0,
+    "skipped": 0,
+    "seconds": 14.741,
+    "failure_ids": [
+      "test_real_bash_pipeline_with_rg (test_sandbox_native.NativeSandboxScenarios.test_real_bash_pipeline_with_rg)",
+      "test_real_registry_credential_canary_is_not_readable (test_sandbox_native.NativeSandboxScenarios.test_real_registry_credential_canary_is_not_readable)"
+    ],
+    "log": "C:\\Users\\叶宸玮\\Documents\\Codex\\2026-11-06\\new-chat-5\\outputs\\harness-v0.39-tool-extraction-20261115\\final-native.log"
+  },
+  "new_offline_test_methods": 14,
+  "behavior_equivalence": {
+    "status": "9/9 passed: 8 equivalence cases plus 1 migration-protection case",
+    "duration_seconds": 10.24,
+    "baseline_source_sha256": "a168cb97b0ffd047cc96e671b8303af238514a0c944b17b23e619962a405d901",
+    "candidate_source_sha256": "a2e8d93bb0b9c2431b0fb6ce4d2e3d40f7a6e9de6920ec3fd9c06308a9877f52",
+    "fixture_zip_sha256": "bc6409019e74449d57347404b448cfb034fc42706e3c09361664a395439abfa1",
+    "normalization": [
+      "temporary source/scenario paths only",
+      "checkpoint binding.source fingerprint only"
+    ],
+    "uuid_policy": "fixed sequence per fresh child; resume sequence starts at 1001",
+    "isolated_child_process_count": 24,
+    "network_requests": 0,
+    "real_model_requests": 0,
+    "scenarios": [
+      {
+        "scenario": "event_exception",
+        "equal": true,
+        "processes_per_version": 1,
+        "checkpoint_save_attempts_per_version": 7,
+        "events_per_version": 5,
+        "model_requests_per_version": 1,
+        "observations_per_version": 20,
+        "normalized_json_sha256": "d90deea261bae0d2ade8e1ed5510cb774f9f221e282b8e864f7404bf866e4ff5"
+      },
+      {
+        "scenario": "evidence_filter",
+        "equal": true,
+        "processes_per_version": 1,
+        "checkpoint_save_attempts_per_version": 12,
+        "events_per_version": 12,
+        "model_requests_per_version": 0,
+        "observations_per_version": 51,
+        "normalized_json_sha256": "4aae63729fd6949bc3a39051788ce452df9812331598c6eaa6238ef3410027e0"
+      },
+      {
+        "scenario": "hard_exit",
+        "equal": true,
+        "processes_per_version": 2,
+        "checkpoint_save_attempts_per_version": 6,
+        "events_per_version": 3,
+        "model_requests_per_version": 1,
+        "observations_per_version": 17,
+        "normalized_json_sha256": "e6cd73266e9f63feaa50ad8c9f0bd5256ae7678995a8fba90604312a8a742df9"
+      },
+      {
+        "scenario": "mixed",
+        "equal": true,
+        "processes_per_version": 1,
+        "checkpoint_save_attempts_per_version": 25,
+        "events_per_version": 25,
+        "model_requests_per_version": 2,
+        "observations_per_version": 81,
+        "normalized_json_sha256": "69e9b003bd2af9d551a791eff90872a908ed8225496a124d26553b24a0089e4f"
+      },
+      {
+        "scenario": "pending_resume",
+        "equal": true,
+        "processes_per_version": 2,
+        "checkpoint_save_attempts_per_version": 17,
+        "events_per_version": 10,
+        "model_requests_per_version": 2,
+        "observations_per_version": 43,
+        "normalized_json_sha256": "f17db0d37abdde2dbf285d73641c5ba9f752c0c747bb1a2712c4bfa68af837ba"
+      },
+      {
+        "scenario": "save_executing",
+        "equal": true,
+        "processes_per_version": 1,
+        "checkpoint_save_attempts_per_version": 7,
+        "events_per_version": 5,
+        "model_requests_per_version": 1,
+        "observations_per_version": 18,
+        "normalized_json_sha256": "046d22c3819b4276b23496b2f7e1bd0b3a727c651e0a1acbffee8678dea33ddf"
+      },
+      {
+        "scenario": "save_recorded",
+        "equal": true,
+        "processes_per_version": 2,
+        "checkpoint_save_attempts_per_version": 8,
+        "events_per_version": 5,
+        "model_requests_per_version": 1,
+        "observations_per_version": 24,
+        "normalized_json_sha256": "e3cc0e07c593ed88cd0bc0582c5e2200d26bac5eec4b9d404819a624160b3634"
+      },
+      {
+        "scenario": "verification",
+        "equal": true,
+        "processes_per_version": 1,
+        "checkpoint_save_attempts_per_version": 17,
+        "events_per_version": 10,
+        "model_requests_per_version": 2,
+        "observations_per_version": 41,
+        "normalized_json_sha256": "507b7fa4ba7dccb3ecbcbae479293abb148ac81b125720e757bb124903814ee2"
+      }
+    ],
+    "limits": [
+      "Bounded scripted cases establish equivalence only for exercised behavior.",
+      "MCP uses local protocol-shaped fixture, not a live MCP server or network.",
+      "Shell backend is injected in-memory; actual Windows sandbox is MAIN separate acceptance.",
+      "Evidence filtering case deliberately injects an orphan result and drives valid batch boundaries directly.",
+      "Private-method monkeypatch/dynamic replacement compatibility covered by separate test_tool_runner.py."
+    ],
+    "import_provenance": {
+      "sidecar_count": 24,
+      "retained_raw": true,
+      "compared_as_behavior": false,
+      "parent_validated": true,
+      "assertions": [
+        "baseline 21 root Python files; candidate 22",
+        "agent/tools/context/permissions/verification/models/checkpoint resolve in intended source root",
+        "candidate agent._tool_runner file equals intended source/tool_runner.py",
+        "candidate dynamic module name equals models namespace plus .tool_runner",
+        "ToolRunner instance class and sys.modules identity match agent._tool_runner",
+        "baseline has no runner module or runner instance"
+      ]
+    },
+    "migration_protection": {
+      "test_kind": "migration_protection",
+      "equal_behavior_comparison": false,
+      "source_binding_fingerprints": [
+        "a5c7c5522bb327d65327f1494644d2b1b6364b2a01e72f5edd0caaadba5db0c3",
+        "59a9652765a0321eb74c2a62b22668033fceec78f8ddacba357ff7a3408f779f"
+      ],
+      "checkpoint_bytes_unchanged": true,
+      "workspace_bytes_unchanged": true,
+      "effect_count_unchanged": true,
+      "new_model_requests": 0,
+      "new_tool_executions": 0,
+      "checkpoint_sha256": "523409f1223b0d85fb09533af9de99e3c1184a14b98a84308a1136c9ffba0fec",
+      "status": "passed; candidate rejected v0.38 pending checkpoint due to source binding mismatch"
+    },
+    "baseline_local_commit": "a942bd36258f34c7fb31f5b908587e7cbd8dffe8"
+  },
+  "behavior_equivalence_evidence": "C:\\Users\\叶宸玮\\Documents\\Codex\\2026-11-06\\new-chat-5\\outputs\\harness-v0.39-tool-extraction-20261115\\evidence\\tool-runner-equivalence",
+  "integrity": {
+    "unchanged_runtime_modules": [
+      "checkpoint.py",
+      "cli.py",
+      "context.py",
+      "execution_backend.py",
+      "file_edits.py",
+      "file_search.py",
+      "limits.py",
+      "mcp_adapter.py",
+      "mcp_notes_server.py",
+      "model_base.py",
+      "model_deepseek.py",
+      "model_openai.py",
+      "models.py",
+      "permissions.py",
+      "prompts.py",
+      "sandbox.py",
+      "state.py",
+      "token_usage.py",
+      "tools.py",
+      "verification.py"
+    ],
+    "agent_methods_changed": [
+      "__init__",
+      "_recorded_model_results",
+      "_invoke_tool",
+      "handle_call"
+    ],
+    "bfcl_and_old_v0_files": 24,
+    "frozen_historical_fixture_files": 1,
+    "historical_version_entries_unchanged": 11,
+    "registered_source_files": 22,
+    "readme_unchanged": true
+  },
+  "review": {
+    "kind": "fresh read-only review",
+    "model": "gpt-6.1-sol",
+    "reasoning_effort": "high",
+    "production_must_fix_count": 0,
+    "test_hardening": "检查动态namespace中Runner真实文件及实例identity；独立imports sidecars与语义对比隔离",
+    "outcome": "生产迁移顺序及限制符合批准范围，8场景等价及跨版本拒绝均离线验证"
+  },
+  "scope": [
+    "唯一新增生产模块tool_runner.py，已有生产仅agent.py四方法及窄view/按版本加载",
+    "Core状态机/登记/恢复/未知收尾不改，Runner单次调用保持原顺序及异常",
+    "动态_invoke_tool和证据筛选覆盖入口保留，Runtime只暴露4属性3方法",
+    "不实现Hook/Middleware Registry，不改状态/Checkpoint格式/权限/模型/工具"
+  ],
+  "deployment_precondition": "切换运行中Agent前归档旧检查点并提示不能跨版本续跑；本批未切换进程或迁移用户状态，不放松源码绑定",
+  "retained_boundaries": [
+    "行为证据覆盖所列场景，不证明所有可能输入数学等价",
+    "event_sink原异常传播和可修改事件行为保留，未改成可选旁观者",
+    "README残留的MCP未实现文字已核实，不在本批白名单内故未改",
+    "GitHub与本地基线不同，本批仅固定隔离本地commit并未推送"
+  ],
+  "changed_files": [
+    "VERSION.json",
+    "agent.py",
+    "tests/fixtures/tool_runner_v038.zip",
+    "tests/fixtures/tool_runner_v038_manifest.json",
+    "tests/test_tool_runner.py",
+    "tests/test_tool_runner_equivalence.py",
+    "tests/tool_runner_equivalence_child.py",
+    "tool_runner.py",
+    "docs/validation/2026-11-15-tool-extraction.json"
+  ]
+}

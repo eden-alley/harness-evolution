@@ -32,6 +32,22 @@ def _codex_executable(workspace):
     raise RuntimeError("找不到工作区外的 codex.exe；请安装或修复本机 Codex CLI。未执行命令。")
 
 
+def _bash_executable(workspace):
+    # Only known Git for Windows installation locations, never PATH or workspace.
+    roots = [Path(os.environ.get("ProgramFiles", r"C:\Program Files")) / "Git"]
+    if os.environ.get("ProgramFiles(x86)"):
+        roots.append(Path(os.environ["ProgramFiles(x86)"]) / "Git")
+    if os.environ.get("LOCALAPPDATA"):
+        roots.append(Path(os.environ["LOCALAPPDATA"]) / "Programs" / "Git")
+    for root in roots:
+        if not root.is_absolute():
+            continue
+        candidate = (root / "bin" / "bash.exe").resolve()
+        if not candidate.is_relative_to(workspace) and candidate.is_file():
+            return candidate
+    raise RuntimeError("找不到工作区外的 Git Bash；未执行命令。")
+
+
 def _terminate_tree(process):
     taskkill = Path(os.environ["SystemRoot"]) / "System32" / "taskkill.exe"
     try:
@@ -42,32 +58,52 @@ def _terminate_tree(process):
     finally:
         if process.poll() is None:
             process.kill()
-        process.communicate()
+        output = process.communicate()
+    return output
 
 
-def run_in_sandbox(command, workspace, timeout):
+def run_in_sandbox(command, workspace, timeout, *, shell="cmd"):
+    if shell not in ("cmd", "bash"):
+        raise ValueError("不支持的 shell；请选择 cmd 或 bash。")
     workspace = Path(workspace).resolve(strict=True)
     executable = _codex_executable(workspace)
-    cmd = Path(os.environ["SystemRoot"]) / "System32" / "cmd.exe"
     environment = {name: value for name, value in os.environ.items()
                    if name.upper() in _ENV_NAMES}
-    # 用批处理文件跨过两层 Windows 参数解析，保留 Python -c 等命令里的引号。
-    # 这里只传脚本路径；脚本仍由沙箱内的 cmd 执行，宿主机不运行命令内容。
-    with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", newline="\r\n",
+    if shell == "bash":
+        interpreter = _bash_executable(workspace)
+        environment["PATH"] = str(interpreter.parent.parent / "usr" / "bin") + os.pathsep + environment.get("PATH", "")
+        suffix, newline, content = ".sh", "\n", command + "\n"
+    else:
+        interpreter = Path(os.environ["SystemRoot"]) / "System32" / "cmd.exe"
+        suffix, newline, content = ".cmd", "\r\n", "@echo off\nchcp 65001 >nul\n" + command + "\n"
+    with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", newline=newline,
                                      dir=workspace, prefix=".agent-command-",
-                                     suffix=".cmd", delete=False) as script:
-        script.write("@echo off\nchcp 65001 >nul\n" + command + "\n")
+                                     suffix=suffix, delete=False) as script:
         script_path = Path(script.name)
+        try:
+            script.write(content)
+        except BaseException:
+            script.close()
+            script_path.unlink(missing_ok=True)
+            raise
+    shell_args = ([str(interpreter), "--noprofile", "--norc", "./" + script_path.name]
+                  if shell == "bash" else
+                  [str(interpreter), "/d", "/s", "/c", ".\\" + script_path.name])
     argv = [str(executable), "sandbox", "-c", "windows.sandbox=mxc",
             "--include-managed-config", "--permission-profile", ":workspace",
-            "-C", str(workspace), "--", str(cmd), "/d", "/s", "/c", ".\\" + script_path.name]
+            "-C", str(workspace), "--", *shell_args]
     try:
         with subprocess.Popen(argv, shell=False, cwd=workspace, env=environment,
                               stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
                               stderr=subprocess.PIPE) as process:
             try:
                 stdout, stderr = process.communicate(timeout=timeout)
-            except (subprocess.TimeoutExpired, KeyboardInterrupt):
+            except subprocess.TimeoutExpired as error:
+                stdout, stderr = _terminate_tree(process)
+                error.output = stdout if stdout else error.output
+                error.stderr = stderr if stderr else error.stderr
+                raise
+            except KeyboardInterrupt:
                 _terminate_tree(process)
                 raise
             return subprocess.CompletedProcess(argv, process.returncode, stdout, stderr)

@@ -12,7 +12,7 @@ import threading
 from uuid import uuid4
 
 from context import atomic_write_json, render_tool_result
-from tools import ToolResult
+from tools import ToolResult, TOOLS
 from verification import CheckResult
 from .state import RunResult, RunState
 from .model_openai import _message
@@ -35,15 +35,23 @@ def binding(runtime):
     model = runtime.model_adapter
     config = getattr(model, 'config', None)
     address = getattr(config, 'base_url', None) or getattr(runtime.client, 'base_url', '')
+    tools = runtime.tools.get_schemas()
+    mcp = getattr(runtime.tools, 'mcp', None)
+    if mcp is not None:
+        tools = {'schemas': tools, 'mcp': mcp.binding}
     return {
         'source': _digest(source),
         'workspace': os.path.normcase(str(runtime.tools.workspace.root.resolve())),
-        'tools': _digest(runtime.tools.get_schemas()),
+        'tools': _digest(tools),
+        'execution_backend': runtime.tools.execution_binding,
         'model': {'provider': getattr(config, 'provider', 'deepseek'),
                   'model_name': getattr(config, 'model_name', runtime.model),
                   'endpoint_hash': hashlib.sha256(str(address).rstrip('/').encode('utf-8')).hexdigest()},
+        'progress': {'report': runtime.progress_report, 'test': runtime.progress_test},
         'limits': {'max_steps': runtime.max_steps, 'soft_limit': runtime.soft_limit,
                    'hard_limit': runtime.hard_limit, 'token_limit': runtime.token_limit,
+                   'compact_target_min': runtime.compact_target_min,
+                   'compact_target_max': runtime.compact_target_max,
                    'wall_time_limit_seconds': runtime.wall_time_limit_seconds},
     }
 
@@ -57,6 +65,7 @@ def capture(runtime, session_id, runtime_binding):
     return {'schema_version': SCHEMA_VERSION, 'session_id': session_id, 'status': 'run',
             'synced': False, 'revision': 0, 'binding': runtime_binding,
             'messages': deepcopy(runtime.messages), 'last_prompt_tokens': runtime.last_prompt_tokens,
+            'context_scale': runtime.context_scale,
             'run_state': asdict(state)}
 
 
@@ -108,6 +117,9 @@ def validate(snapshot):
         raise ValueError('检查点消息无效')
     if type(snapshot.get('last_prompt_tokens')) is not int or snapshot['last_prompt_tokens'] < 0:
         raise ValueError('检查点上下文用量无效')
+    scale = snapshot.get('context_scale', 1.0)
+    if type(scale) not in (int, float) or not math.isfinite(scale) or scale < 1:
+        raise ValueError('检查点上下文估算校正无效')
     for key in ('events', 'tool_results', 'usage_history', 'unknown_usage', 'active_batch'):
         if not isinstance(state[key], list):
             raise ValueError(f'检查点 {key} 无效')
@@ -183,7 +195,15 @@ def validate(snapshot):
             raise ValueError('检查点执行批次来源无效')
         if record['status'] == 'recorded':
             result = {k: v for k, v in record['result'].items() if k not in ('call_id', 'tool', 'source')}
-            expected = render_tool_result(ToolResult(**result))
+            expected = render_tool_result(ToolResult(**result), call_id=record['call']['id'])
+            try:
+                output_tokens = json.loads(record['call']['function']['arguments'] or "{}").get("max_output_tokens")
+            except (ValueError, AttributeError):
+                output_tokens = None
+            if (record['call']['function']['name'] in TOOLS and
+                    type(output_tokens) is int and 1 <= output_tokens <= 4096):
+                expected = render_tool_result(ToolResult(**result), call_id=record['call']['id'],
+                                              max_output_tokens=output_tokens)
             if not any(m.get('role') == 'tool' and m.get('tool_call_id') == record['call']['id']
                        and m.get('content') == expected for m in messages):
                 raise ValueError('检查点已记录结果缺少工具消息')

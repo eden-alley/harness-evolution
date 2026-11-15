@@ -1,0 +1,8 @@
+{
+  "server": "deepwiki",
+  "url": "https://mcp.deepwiki.com/mcp",
+  "allow_tools": [
+    "read_wiki_structure"
+  ],
+  "read_only_tools": []
+}

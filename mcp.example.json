@@ -1,0 +1,14 @@
+{
+  "server": "notes",
+  "command": "python",
+  "args": [
+    "-B",
+    "mcp_notes_server.py"
+  ],
+  "allow_tools": [
+    "lookup_note"
+  ],
+  "read_only_tools": [
+    "lookup_note"
+  ]
+}

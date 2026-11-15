@@ -1,4 +1,5 @@
 """模型负责推进任务；harness 负责执行、记录和可选的任务验收。"""
+from collections import Counter
 from copy import deepcopy
 from contextlib import nullcontext
 import json
@@ -7,17 +8,19 @@ from pathlib import Path
 import sys
 from uuid import uuid4
 
-from context import clear_old_tool_results, compact, render_tool_result
+from context import (compact, render_tool_result, estimate_input_tokens, validate_context_limits,
+                     ContextBudgetError, CONTEXT_INPUT_BUDGET, COMPACT_THRESHOLD,
+                     COMPACT_TARGET_MIN, COMPACT_TARGET_MAX)
 from permissions import PermissionManager
-from prompts import SYSTEM
+from prompts import SYSTEM, TASK_PROGRESS_SYSTEM
 from token_usage import TokenUsage
-from tools import ToolResult
+from tools import ToolResult, TOOLS
 from verification import CheckResult, VerificationInput
 
 MODEL = "deepseek-flash"
 MAX_STEPS = 30
-SOFT_LIMIT = 16000
-HARD_LIMIT = 24000
+SOFT_LIMIT = COMPACT_THRESHOLD
+HARD_LIMIT = CONTEXT_INPUT_BUDGET
 
 # 每份 Agent 源码绑定自己的模型模块；兼容只复制根目录 *.py 的版本加载器。
 _model_spec = importlib.util.spec_from_file_location(
@@ -29,15 +32,60 @@ _model_spec.loader.exec_module(models)
 _state = importlib.import_module(f'{models.__name__}.state')
 checkpoints = importlib.import_module(f'{models.__name__}.checkpoint')
 limits = importlib.import_module(f'{models.__name__}.limits')
+_tool_runner = importlib.import_module(f'{models.__name__}.tool_runner')
 RunResult, RunState = _state.RunResult, _state.RunState
+
+
+class _ToolRuntimeView:
+    """Read current Agent dependencies without exposing its model or scheduling API."""
+    __slots__ = ('_owner',)
+
+    def __init__(self, owner):
+        self._owner = owner
+
+    @property
+    def tools(self):
+        return self._owner.tools
+
+    @property
+    def permissions(self):
+        return self._owner.permissions
+
+    @property
+    def run_state(self):
+        return self._owner.run_state
+
+    @property
+    def messages(self):
+        return self._owner.messages
+
+    def _register_call(self, call, source):
+        return self._owner._register_call(call, source)
+
+    def _emit(self, kind, **data):
+        return self._owner._emit(kind, **data)
+
+    def _save_checkpoint(self):
+        return self._owner._save_checkpoint()
 
 
 class Agent:
     def __init__(self, client, tools, *, permissions=None, token_usage=None,
                  model=MODEL, max_steps=MAX_STEPS, soft_limit=SOFT_LIMIT,
                  hard_limit=HARD_LIMIT, event_sink=None, model_adapter=None, checkpoint_store=None,
-                 token_limit=0, wall_time_limit_seconds=0):
+                 token_limit=0, wall_time_limit_seconds=0,
+                 progress_report=None, progress_test=None,
+                 compact_target_min=COMPACT_TARGET_MIN, compact_target_max=COMPACT_TARGET_MAX,
+                 after_tool=None):
+        """after_tool observes immutable summaries after the result-save point.
+
+        It is optional trusted Python code, runs synchronously in the current
+        lease, and must return quickly without mutating or reentering this Agent.
+        Ordinary failures are isolated; recorded operations are not notified
+        again on resume. No checkpoint store means memory recording only.
+        """
         limits.validate(token_limit, wall_time_limit_seconds)
+        validate_context_limits(soft_limit, hard_limit, compact_target_min, compact_target_max)
         self.client = client
         self._model_adapter = model_adapter
         self.tools = tools
@@ -48,15 +96,25 @@ class Agent:
         self.max_steps = max_steps
         self.token_limit = token_limit
         self.wall_time_limit_seconds = wall_time_limit_seconds
+        self.progress_report = progress_report
+        self.progress_test = progress_test
+        if progress_report and tools.workspace.resolve(progress_report) is None:
+            raise ValueError("进展检查的报告路径须在工作区内。")
         self.soft_limit = soft_limit
         self.hard_limit = hard_limit
+        self.compact_target_min = compact_target_min
+        self.compact_target_max = compact_target_max
+        self.context_scale = 1.0
         self.messages = [{"role": "system", "content": SYSTEM}]
         self.last_prompt_tokens = 0
         self.event_sink = event_sink
+        self.after_tool = after_tool
         self.run_state = RunState()
         self.checkpoint_store = checkpoint_store
         self._checkpoint_binding = None
         self._checkpoint_session_id = None
+        self.tool_runner = _tool_runner.ToolRunner()
+        self._tool_runtime = _ToolRuntimeView(self)
         self._usage_owner = uuid4().hex
 
     @property
@@ -121,48 +179,19 @@ class Agent:
             'call': deepcopy(call), 'source': source, 'status': 'pending', 'result': None}
         return operation_id
 
+    def _recorded_model_results(self):
+        return self.tool_runner.recorded_model_results(self._tool_runtime)
+
     def _invoke_tool(self, name, args, operation_id=None):
-        args = deepcopy(args)
-        invalid = self.tools.validate_call(name, args)
-        if invalid is not None:
-            return invalid
-        try:
-            approval_args = deepcopy(args)
-            decision = self.permissions.check(name, approval_args)
-        except (TypeError, ValueError) as error:
-            return ToolResult(False, code="invalid_arguments", message=f"{type(error).__name__}: {error}")
-        if not decision.allowed:
-            return ToolResult(False, code=decision.code, message=decision.reason)
-        if approval_args != args:
-            return ToolResult(False, code="execution_error", message="权限组件修改了工具参数，未执行操作。")
-        if operation_id is not None:
-            self.run_state.call_records[operation_id]['status'] = 'executing'
-            self._save_checkpoint()
-        return self.tools.execute(name, args)
+        return self.tool_runner.invoke(
+            self._tool_runtime, name, args, operation_id,
+            recorded_model_results=lambda: self._recorded_model_results())
 
     def handle_call(self, call, *, source="model", operation_id=None):
-        operation_id = operation_id or self._register_call(call, source)
-        name = call['function']['name']
-        arguments = call['function']['arguments']
-        self._emit("tool_call", call_id=call['id'], tool=name,
-                   arguments=arguments, source=source)
-        try:
-            args = json.loads(arguments or "{}")
-        except json.JSONDecodeError:
-            result = ToolResult(False, code="invalid_arguments", message="参数不是合法的 JSON")
-        else:
-            result = self._invoke_tool(name, args, operation_id)
-        evidence = {"call_id": call['id'], "tool": name, "source": source, **result.to_dict()}
-        self.run_state.tool_results.append(deepcopy(evidence))
-        record = self.run_state.call_records[operation_id]
-        record.update(status='recorded', result=deepcopy(evidence))
-        if source == 'model' and call['id'] in self.run_state.pending_calls:
-            self.messages.append({'role': 'tool', 'tool_call_id': call['id'],
-                                  'content': render_tool_result(result)})
-            self.run_state.pending_calls.pop(call['id'])
-        self._emit("tool_result", **evidence)
-        self._save_checkpoint()
-        return result
+        return self.tool_runner.handle_call(
+            self._tool_runtime, call, source=source, operation_id=operation_id,
+            invoke_tool=lambda name, args, operation_id=None: self._invoke_tool(name, args, operation_id),
+            after_tool=self.after_tool)
 
     def _verification_tool(self, name, args):
         call = {'id': f'verification-{uuid4().hex}',
@@ -283,6 +312,7 @@ class Agent:
                     self.checkpoint_store.trace_event_floor(state.run_id))
                 self.run_state, self.messages = state, deepcopy(saved['messages'])
                 self.last_prompt_tokens = saved['last_prompt_tokens']
+                self.context_scale = saved.get('context_scale', 1.0)
                 self._checkpoint_session_id = saved['session_id']
                 self._checkpoint_binding = saved['binding']
                 if decision['status'] == 'finished':
@@ -304,6 +334,51 @@ class Agent:
         except (checkpoints.CheckpointError, ValueError, TypeError, KeyError, OSError) as error:
             return RunResult(f'检查点恢复失败：{error}', 'error')
 
+    def _task_progress_context(self):
+        if not self.tools.is_available("update_progress"):
+            return []
+        # 进度正文已作为工具结果进入历史，此处只附加固定指导语。
+        return [{"role": "system", "content": TASK_PROGRESS_SYSTEM}]
+
+    def _progress_reminder(self):
+        if not (self.progress_report or self.progress_test):
+            return None
+        state = self.run_state
+        for event in state.events:
+            if event["type"] == "progress_reminder":
+                return event["text"] if event["step"] == state.steps_used else None
+
+        records = [record for record in state.call_records.values()
+                   if record["source"] == "model" and record["status"] == "recorded"]
+        recent = records[-6:]
+        read_tools = {"read_file", "list_dir", "read_tool_result"}
+        if len(recent) < 6 or any(not r["result"]["ok"] or r["result"]["tool"] not in read_tools for r in recent):
+            return None
+        reads = Counter((r["result"]["tool"],
+                         json.dumps(json.loads(r["call"]["function"]["arguments"] or "{}"), sort_keys=True))
+                        for r in recent)
+        if max(reads.values()) < 3:
+            return None
+
+        outstanding = []
+        if self.progress_report:
+            path = self.tools.workspace.resolve(self.progress_report)
+            if path is not None and path.is_file():
+                return None
+            outstanding.append(f"交付文件 {self.progress_report} 尚未出现")
+        if self.progress_test:
+            if any(r["result"].get("exit_code") == 0 and r["result"]["ok"]
+                   and r["result"]["tool"] == "run_shell"
+                   and json.loads(r["call"]["function"]["arguments"]).get("command") == self.progress_test
+                   for r in records):
+                return None
+            outstanding.append(f"指定测试尚无成功记录（{self.progress_test}）")
+
+        text = "近期有多次相同查阅，且还未看到约定的进展：" + "，".join(outstanding)
+        text += "。请检查已有证据，判断接下来需要完成哪项交付或补充哪条信息。"
+        self._emit("progress_reminder", step=state.steps_used, text=text)
+        return text
+
     def _run_loop(self, verifier, *, resumed=False):
         state = self.run_state
         try:
@@ -316,26 +391,46 @@ class Agent:
                         return self._finish('（达到最大步数，已停止）', 'max_steps', state.verification)
                     state.steps_used += 1
                     state.phase = 'preparing'
-                    if self.last_prompt_tokens > self.hard_limit:
+                    estimated = estimate_input_tokens(self.messages + self._task_progress_context(),
+                                                      self.tools.get_schemas(), scale=self.context_scale)
+                    if max(estimated, self.last_prompt_tokens) >= self.soft_limit:
                         state.next_action = 'summary'
                     else:
-                        if self.last_prompt_tokens > self.soft_limit:
-                            clear_old_tool_results(self.messages)
                         state.next_action = 'request'
                     self._save_checkpoint()
                 if state.next_action == 'summary':
                     def before_summary():
                         state.request_inflight = 'summary'
                         self._save_checkpoint()
-                    self.messages[:] = compact(model, self.messages, self.token_usage.record,
-                                               before_query=before_summary)
+                    progress_context = self._task_progress_context()
+                    before = estimate_input_tokens(self.messages + progress_context, self.tools.get_schemas())
+                    candidate = compact(model, self.messages, self.token_usage.record,
+                                        before_query=before_summary, tools=self.tools.get_schemas(),
+                                        budget=self.hard_limit, target_min=self.compact_target_min,
+                                        target_max=self.compact_target_max, scale=self.context_scale,
+                                        recorded_results=state.tool_results, extra_context=progress_context)
+                    self.messages[:] = candidate
+                    after = estimate_input_tokens(self.messages + progress_context, self.tools.get_schemas())
+                    self._emit("context_compacted", before_tokens=before, after_tokens=after,
+                               estimated=True, target_min=self.compact_target_min,
+                               target_max=self.compact_target_max)
+                    self.last_prompt_tokens = 0
                     state.request_inflight, state.next_action = None, 'request'
                     self._save_checkpoint()
                 if state.next_action == 'request':
                     state.phase, state.request_inflight = 'model', 'model'
+                    reminder = self._progress_reminder()
                     self._save_checkpoint()
-                    response = model.query(self.messages, tools=self.tools.get_schemas())
+                    messages = self.messages + self._task_progress_context()
+                    if reminder is not None:
+                        messages = [*messages, {"role": "system", "content": reminder}]
+                    input_estimate = estimate_input_tokens(messages, self.tools.get_schemas())
+                    if estimate_input_tokens(messages, self.tools.get_schemas(), scale=self.context_scale) > self.hard_limit:
+                        raise ContextBudgetError("本次请求超过输入预算，已保留执行现场。")
+                    response = model.query(messages, tools=self.tools.get_schemas())
                     self.last_prompt_tokens = (response.usage.prompt_tokens or 0) if response.usage else 0
+                    if self.last_prompt_tokens:
+                        self.context_scale = max(1.0, self.last_prompt_tokens / input_estimate)
                     self.token_usage.record(response.usage, '对话')
                     state.response = {'message': response.message, 'protocol_error': response.protocol_error}
                     state.request_inflight, state.next_action = None, 'response'
@@ -398,6 +493,9 @@ class Agent:
                          "evidence": verification.evidence}, ensure_ascii=False)})
                 state.candidate, state.next_action = None, 'prepare'
                 self._save_checkpoint()
+        except ContextBudgetError as error:
+            return self._finish(f'（上下文限制）{error}', 'context_limit', state.verification,
+                                checkpoint_final=False)
         except limits.LimitReached as error:
             try:
                 return self._finish(f'（运行限制）{error}', error.reason, state.verification)

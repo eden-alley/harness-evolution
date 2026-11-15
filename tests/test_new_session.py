@@ -77,7 +77,7 @@ class NewSessionScenarios(OfflineScenario):
             {"role": "system", "content": agent.SYSTEM}, {"role": "user", "content": task}])
         self.assertIn({"role": "user", "content": task}, self.requests[2]["messages"])
         self.assertIn({"role": "tool", "tool_call_id": "read-new", "content": json.dumps(
-            {"ok": True, "data": "新任务文件内容"}, ensure_ascii=False)},
+            {"ok": True, "data": "[行 1-1；文件已读完]\n1: 新任务文件内容"}, ensure_ascii=False)},
                       self.requests[2]["messages"])
         self.assertEqual(self.requests[2]["messages"][-1], {"role": "user", "content": followup})
         saved = self.store.load("default")

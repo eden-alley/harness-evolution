@@ -8,6 +8,7 @@ sys.path.insert(0, source)
 import agent
 from permissions import Workspace
 from tools import Toolset
+from checkpoint_backend import CheckpointFixtureBackend
 import tools
 
 store = agent.checkpoints.CheckpointStore(state_dir)
@@ -55,7 +56,7 @@ if mode == 'reply':
 
     store.save = crash_after_reply
 
-runtime = agent.Agent(None, Toolset(Workspace(workspace)), model_adapter=FixtureModel(),
+runtime = agent.Agent(None, Toolset(Workspace(workspace), backend=CheckpointFixtureBackend()), model_adapter=FixtureModel(),
                       checkpoint_store=store, max_steps=int(limit))
 runtime.permissions.set_auto_approve(True)
 runtime.run('硬退出测试')

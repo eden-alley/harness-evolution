@@ -46,7 +46,7 @@ class ExitCheckScenarios(OfflineScenario):
         self.assertEqual(reviewed["task"], "读取 seed.txt")
         self.assertEqual(reviewed["candidate"], result.text)
         self.assertEqual(reviewed["criteria"], "内容必须来自实际读取的文件")
-        self.assertEqual(reviewed["tool_results"][0]["data"], "真实文件内容")
+        self.assertEqual(reviewed["tool_results"][0]["data"], "[行 1-1；文件已读完]\n1: 真实文件内容")
         self.assertIn("read_file", reviewed["available_tools"])
         self.assertEqual(self.agent.token_usage.totals,
                          {"prompt_tokens": 80, "completion_tokens": 3, "total_tokens": 83})

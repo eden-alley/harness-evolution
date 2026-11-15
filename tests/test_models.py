@@ -1,4 +1,5 @@
 """模型层离线契约：真实 SDK 编解码，本地响应，不读取真实密钥。"""
+from test_file_reads import file_page
 from copy import deepcopy
 import contextlib
 import importlib.util
@@ -176,7 +177,7 @@ class ModelScenarios(OfflineScenario):
         evidence = self.agent.run_state.tool_results
         self.assertEqual(evidence[0]['code'], 'invalid_arguments')
         self.assertTrue(evidence[1]['ok'])
-        self.assertEqual(evidence[1]['data'], 'seed')
+        self.assertEqual(file_page(evidence[1]['data'])[1], ['seed'])
         history_wire = self.requests[-1]['messages']
         self.assertFalse(any('reasoning_content' in m or 'vendor_field' in m for m in history_wire))
         raw = next(e['response'] for e in self.agent.events if e['type'] == 'model_response')
@@ -212,15 +213,19 @@ class ModelScenarios(OfflineScenario):
         self.assertEqual(self.requests[-1]['max_tokens'], 9)
         self.assertEqual(self.agent.token_usage.totals['total_tokens'], 7)
 
-    def test_empty_advertised_tools_still_return_unavailable_feedback_in_execution_loop(self):
-        # 工具执行回合的 [] 不等于摘要/验收禁止调用工具的 None。
-        self.layer()
+    def test_empty_advertised_tools_rejects_unsolicited_calls_without_retry(self):
         self.replace(self.tools, 'get_schemas', lambda: [])
-        self.model([tool_reply(call('missing', 'not_installed', {})), answer('缺少工具，已说明')])
+        self.model([tool_reply(call('missing', 'not_installed', {}))])
         self.run_agent('没有可用工具', self.agent.permissions)
+        self.assertEqual(self.last_result.stop_reason, 'error')
+        self.assertNotIn('tools', self.requests[0])
+        self.assertEqual(self.agent.run_state.tool_results, [])
+        self.assertEqual(len(self.all_requests), 1)
+
+    def test_unknown_tool_with_nonempty_catalog_returns_feedback(self):
+        self.model([tool_reply(call('missing', 'not_installed', {})), answer('缺少工具')])
+        self.run_agent('尝试工具', self.agent.permissions)
         self.assertEqual(self.last_result.stop_reason, 'end_turn')
-        self.assertEqual(self.last_result.text, '缺少工具，已说明')
-        self.assertEqual(self.requests[0]['tools'], [])
         self.assertEqual(self.agent.run_state.tool_results[0]['code'], 'tool_unavailable')
         self.assertEqual(len(self.all_requests), 2)
 

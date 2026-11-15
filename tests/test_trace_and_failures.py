@@ -1,4 +1,5 @@
 """结构化错误、原始轨迹、上下文分离及失败后的会话一致性。"""
+from test_file_reads import file_page
 import contextlib
 import io
 import json
@@ -34,11 +35,11 @@ class TraceAndFailureScenarios(OfflineScenario):
                          {item["function"]["name"] for item in self.tools.get_schemas()})
 
     def test_raw_trace_survives_truncation_cleanup_and_new_session(self):
-        raw = "HEAD" + "x" * 11992 + "TAIL"
+        raw = "HEAD\n" + "middle\n" * 2000 + "TAIL"
         (self.workspace / "long.txt").write_text(raw, encoding="utf-8")
         self.model([
             (tool_reply(*(call(f"read-{i}", "read_file", {"path": "long.txt"})
-                          for i in range(4))), self.agent.soft_limit + 1),
+                          for i in range(4))), 16001),
             (answer("长文件任务结束"), 20), (answer("新会话你好"), 30)])
         with patch("builtins.input", side_effect=["读取长文件", "/new", "你好", "exit"]), \
                 contextlib.redirect_stdout(io.StringIO()):
@@ -51,13 +52,12 @@ class TraceAndFailureScenarios(OfflineScenario):
         self.assertEqual(len({e["run_id"] for e in starts}), 2)
         results = [e for e in events if e["type"] == "tool_result"]
         self.assertEqual(len(results), 4)
-        self.assertTrue(all(e["data"] == raw and e["ok"] for e in results))
+        self.assertTrue(all(e["ok"] and "HEAD" in e["data"] and "TAIL" not in e["data"] for e in results))
         model_tools = [m for m in self.requests[1]["messages"] if m["role"] == "tool"]
-        self.assertIn("旧工具结果已清理", model_tools[0]["content"])
         preview = json.loads(model_tools[-1]["content"])
-        self.assertTrue(preview["truncated"])
-        self.assertEqual(preview["original_chars"], len(raw))
-        self.assertLess(len(preview["data"]), 4200)
+        self.assertNotIn("truncated", preview)
+        self.assertEqual(preview["data"], results[-1]["data"])
+        self.assertLessEqual(len(preview["data"]), 4000)
         self.assertNotIn("读取长文件", json.dumps(self.requests[2], ensure_ascii=False))
         self.assertEqual(self.store.load("default")[-1]["content"], "新会话你好")
         self.assertNotIn("offline-test-key", content)
@@ -93,7 +93,7 @@ class TraceAndFailureScenarios(OfflineScenario):
         self.assertEqual(self.last_result.stop_reason, "error")
         self.assertEqual(messages[-1]["content"], result)
         outputs = [json.loads(m["content"]) for m in messages if m["role"] == "tool"]
-        self.assertEqual(outputs[0]["data"], "first-ok")
+        self.assertEqual(file_page(outputs[0]["data"])[1], ["first-ok"])
         self.assertTrue(all(o["code"] == "execution_error" for o in outputs[1:]))
         self.assertFalse((self.workspace / "never.txt").exists())
         recorded = [e for e in self.agent.events if e["type"] == "tool_result"]
