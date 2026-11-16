@@ -267,7 +267,8 @@ def read_file(tools, path, *, start_line=None, end_line=None, _output_chars=MAX_
             # 先容纳可能完整结束的页；不能因假想的续读说明而提前拒绝。
             if eof or range_done or size + _read_size(minimal_head, _output_bytes) > limit:
                 break
-            line = following + stream.readline()
+            # 预读字符若已是换行，它单独构成一个空行，不能再吞入下一物理行。
+            line = following if following == "\n" else following + stream.readline()
             number += 1
     while lines:
         head, tail = _file_page_frame(path, start_line, number, eof=eof, range_done=range_done,

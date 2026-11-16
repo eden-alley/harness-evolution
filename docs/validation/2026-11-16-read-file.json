@@ -1,0 +1,24 @@
+{
+  "status": "offline_verified",
+  "harness_version": "0.41",
+  "theme": "read_file physical blank lines",
+  "source_sha256": "d8ece38777f75996e1c387ecc65e408b44cf7aff2174f0092e03eb87aefcecb0",
+  "baseline_version": "0.40",
+  "focused": {
+    "tests": 13,
+    "passed": 13,
+    "log": "C:\\Users\\叶宸玮\\Documents\\Codex\\2026-11-16\\d-projects-agent-harness-handoffs-2026\\outputs\\第一批离线验证证据\\read-file-green.log"
+  },
+  "offline": {
+    "tests": 280,
+    "passed": 280,
+    "skipped": 0,
+    "seconds": 29.146,
+    "log": "C:\\Users\\叶宸玮\\Documents\\Codex\\2026-11-16\\d-projects-agent-harness-handoffs-2026\\outputs\\第一批离线验证证据\\harness-offline-host.log"
+  },
+  "failed_environment_attempt": "C:\\Users\\叶宸玮\\Documents\\Codex\\2026-11-16\\d-projects-agent-harness-handoffs-2026\\outputs\\第一批离线验证证据\\harness-offline.log",
+  "native_suite_run": false,
+  "real_model_requests": 0,
+  "frozen_evaluation_modified": false,
+  "evidence_directory": "C:\\Users\\叶宸玮\\Documents\\Codex\\2026-11-16\\d-projects-agent-harness-handoffs-2026\\outputs\\第一批离线验证证据"
+}

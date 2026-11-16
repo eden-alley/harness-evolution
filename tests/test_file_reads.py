@@ -42,6 +42,53 @@ def result_page(data):
 
 
 class FileReadContinuationTests(OfflineScenario):
+    def test_blank_lines_have_individual_physical_numbers(self):
+        rows = ['first', '', '', 'fourth', '']
+        for newline in ('\n', '\r\n', '\r'):
+            with self.subTest(newline=repr(newline)):
+                (self.workspace / 'blanks').write_bytes((newline.join(rows) + newline).encode())
+                result = self.tools.execute('read_file', {'path': 'blanks'})
+                self.assertTrue(result.ok, result)
+                self.assertEqual(result.data, '[行 1-5；文件已读完]\n1: first\n2: \n3: \n4: fourth\n5: \n')
+                self.assertEqual(file_page(result.data)[1:], (rows, None))
+
+    def test_blank_line_at_range_end_does_not_include_next_line(self):
+        (self.workspace / 'range-blanks').write_text('first\n\nprivate-third\n', encoding='utf-8')
+        result = self.tools.execute('read_file', {'path': 'range-blanks', 'end_line': 2})
+        self.assertTrue(result.ok, result)
+        self.assertNotIn('private-third', result.data)
+        head, rows, following = file_page(result.data)
+        self.assertEqual((head[3], rows, following), ('指定范围已读完，文件尚有内容', ['first', ''],
+                                                    {'path': 'range-blanks', 'start_line': 3}))
+        last = self.tools.execute('read_file', following)
+        self.assertEqual(file_page(last.data)[1:], (['private-third'], None))
+
+    def test_pages_with_consecutive_blank_lines_rebuild_without_overlap(self):
+        rows = ['\ufeff首行😀', '', ''] + [value for i in range(24) for value in (f'{i:02d} 中文😀 ' + 'x' * 40, '', '')] + ['尾行']
+        separators = ('\n', '\r\n', '\r')
+        text = ''.join(row + separators[i % 3] for i, row in enumerate(rows[:-1])) + rows[-1]
+        (self.workspace / 'mixed').write_bytes(text.encode('utf-8'))
+        for budget in (None, 64, 128):
+            with self.subTest(budget=budget):
+                args = {'path': 'mixed'}
+                if budget is not None:
+                    args['max_output_tokens'] = budget
+                rebuilt = []
+                for _ in range(len(rows) + 1):
+                    result = self.tools.execute('read_file', args)
+                    self.assertTrue(result.ok, result)
+                    head, page, following = file_page(result.data)
+                    self.assertEqual(int(head[1]), len(rebuilt) + 1)
+                    rebuilt.extend(page)
+                    if following is None:
+                        self.assertEqual(head[3], '文件已读完')
+                        break
+                    self.assertEqual(following['start_line'], len(rebuilt) + 1)
+                    args = following
+                else:
+                    self.fail('分页未能在物理行数范围内结束')
+                self.assertEqual(rebuilt, rows)
+
     def test_rebuild_all_lines_universal_newlines_and_bom_with_budgets(self):
         lines = ['\ufeff首行😀'] + [f'{i} 中文😀 ' + 'x' * 35 for i in range(150)] + ['尾行']
         raw = ''.join(line + ('\r\n' if i % 3 == 0 else '\r' if i % 3 == 1 else '\n') for i, line in enumerate(lines[:-1])) + lines[-1]
