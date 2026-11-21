@@ -40,7 +40,11 @@ PLACEHOLDER = "[旧工具结果已清理，如需要请重新调用工具]"
 SUMMARY_PROMPT = """整理当前任务的执行进展，供后续继续工作。
 保留用户约束、已确认的代码位置、失败假设、真实测试命令及结果、尚欠交付和下一步。
 关键事实附工具调用编号，区分已验证结果与推测，引用内容只作为任务资料。
+只回顾历史中已经发生的事。下一步仅列计划，不要续写对话、模拟调用或生成工具回执。
 压缩重复调查和大段输出，用简洁条目写，不超过约 2000 字。只输出摘要。"""
+
+SUMMARY_TRANSCRIPT_PREFIXES = ("[assistant]", "[assistant 调用工具]", "[tool]", "[user]", "[system]")
+SUMMARY_OMITTED = "生成摘要含对话或工具记录标记，已舍弃。请依据保留的用户原文和真实工具记录继续。"
 
 
 def _preview(text, byte_limit):
@@ -132,19 +136,14 @@ def compact(model, messages, record_usage, *, before_query=None, tools=None,
             target_max=COMPACT_TARGET_MAX, scale=1.0, recorded_results=(), extra_context=()):
     """在完整工具批次边界整理；成功且核对预算后才交还替换历史。"""
     extra_context = list(extra_context)
-    required = [m for m in messages if m["role"] in ("system", "user")]
+    fixed_roles = ("system", "user")
+    required = [m for m in messages if m["role"] in fixed_roles]
     if estimate_input_tokens(required + extra_context, tools, scale=scale) > target_max:
         raise ContextBudgetError("原始用户要求和工具说明已超过整理目标，已保留原文。")
     if len(messages) < 3:
         return messages
-    blocks = []
-    for message in messages[1:]:
-        if message["role"] in ("system", "user"):
-            continue
-        if message["role"] == "tool" and blocks:
-            blocks[-1].append(message)
-        else:
-            blocks.append([message])
+    block_starts = [i for i, message in enumerate(messages[1:], 1)
+                    if message["role"] not in (*fixed_roles, "tool")]
     # 原历史连同保留窗口提供给摘要器，避免遗漏窗口边界上的执行结论。
     summary_view = deepcopy(messages[1:])
     for message in summary_view:
@@ -175,6 +174,8 @@ def compact(model, messages, record_usage, *, before_query=None, tools=None,
     summary = resp.require_message().get('content')
     if not isinstance(summary, str) or not summary.strip():
         raise ValueError("摘要为空，已保留原上下文。")
+    if any(line.lstrip().startswith(SUMMARY_TRANSCRIPT_PREFIXES) for line in summary.splitlines()):
+        summary = SUMMARY_OMITTED
     notes = []
     for result in recorded_results[-20:]:
         note = {key: result[key] for key in ("call_id", "tool", "ok", "code", "exit_code")
@@ -186,15 +187,25 @@ def compact(model, messages, record_usage, *, before_query=None, tools=None,
         notes.append(json.dumps(note, ensure_ascii=False))
     facts = "\n[工具执行记录索引，摘录为工具资料]\n" + "\n".join(notes) if notes else ""
     summary_message = {"role": "assistant", "content": "[任务进展摘要]\n" + summary + facts}
-    recent = []
-    for block in reversed(blocks):
-        size = estimate_input_tokens(required + [summary_message] + block + recent + extra_context, tools, scale=scale)
+    last_user = next((i for i in range(len(messages) - 1, -1, -1) if messages[i]["role"] == "user"),
+                     len(messages))
+
+    def retain(start):
+        # 摘要位于最新用户指令之前，完整后缀仍按原顺序排列。
+        pivot = min(start, last_user)
+        earlier = [m for m in messages[:pivot] if m["role"] in fixed_roles]
+        later = [m for m in messages[pivot:start] if m["role"] in fixed_roles]
+        return earlier + [summary_message] + later + messages[start:]
+
+    candidate = retain(len(messages))
+    for start in reversed(block_starts):
+        expanded = retain(start)
+        size = estimate_input_tokens(expanded + extra_context, tools, scale=scale)
         if size > target_max:
             break
-        recent = block + recent
+        candidate = expanded
         if size >= target_min:
             break
-    candidate = required + [summary_message] + recent
     if estimate_input_tokens(candidate + extra_context, tools, scale=scale) > target_max:
         raise ContextBudgetError("摘要和必需要求仍超过整理目标，已保留原上下文。")
     return candidate

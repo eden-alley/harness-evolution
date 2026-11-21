@@ -12,7 +12,7 @@ import unittest
 from uuid import uuid4
 from unittest.mock import patch
 
-from scenario_support import OfflineScenario, ROOT, permissions, tools
+from scenario_support import OfflineScenario, ROOT, answer, call, permissions, tool_reply, tools
 from sandbox import _codex_executable, _bash_executable, run_in_sandbox
 
 
@@ -37,6 +37,64 @@ class NativeSandboxScenarios(OfflineScenario):
 
     def python_command(self, code):
         return subprocess.list2cmdline([sys.executable, "-B", "-c", f"exec({code!r})"])
+
+    def test_real_project_read_only_rule(self):
+        protected = self.workspace / "input.txt"
+        protected.write_bytes(b"original")
+        baseline = tools.Toolset(permissions.Workspace(self.workspace))
+        control = baseline.execute("run_shell", {"command": "echo ordinary>input.txt"})
+        self.assertTrue(control.ok, control)
+        self.assertEqual(protected.read_bytes().strip(), b"ordinary")
+        protected.write_bytes(b"original")
+        toolset = tools.Toolset(permissions.Workspace(self.workspace, read_only_paths=["input.txt"]))
+
+        for command in ("echo changed>input.txt", "ren input.txt moved.txt", "del /q input.txt"):
+            with self.subTest(command=command):
+                result = toolset.execute("run_shell", {"command": command})
+                self.assertEqual(protected.read_bytes(), b"original", result)
+                self.assertFalse((self.workspace / "moved.txt").exists())
+        valid = toolset.execute("run_shell", {"command": "type input.txt && echo allowed>proposal.txt"})
+        self.assertTrue(valid.ok, valid)
+        self.assertIn("original", valid.data)
+        self.assertEqual((self.workspace / "proposal.txt").read_bytes().strip(), b"allowed")
+        self.assertEqual(list(self.workspace.glob(".agent-command-*.cmd")), [])
+
+    def test_real_project_directory_rule(self):
+        private_input = self.workspace / "samples"
+        private_input.mkdir()
+        protected = private_input / "input.txt"
+        protected.write_bytes(b"original")
+        toolset = tools.Toolset(permissions.Workspace(self.workspace, read_only_paths=["samples"]))
+        write = toolset.execute("run_shell", {"command": "echo changed>samples\\input.txt"})
+        self.assertFalse(write.ok, write)
+        result = toolset.execute("run_shell", {"command": "ren samples moved"})
+        self.assertTrue(protected.is_file(), result)
+        self.assertEqual(protected.read_bytes(), b"original")
+        valid = toolset.execute("run_shell", {"command": "type samples\\input.txt && echo allowed>proposal.txt"})
+        self.assertTrue(valid.ok, valid)
+        self.assertIn("original", valid.data)
+        self.assertEqual((self.workspace / "proposal.txt").read_bytes().strip(), b"allowed")
+
+    def test_real_project_rule_in_agent_loop(self):
+        protected = self.workspace / "input.txt"
+        protected.write_bytes(b"original")
+        self.tools = tools.Toolset(permissions.Workspace(self.workspace, read_only_paths=["input.txt"]))
+        self.agent.tools = self.tools
+        policy = permissions.PermissionManager(workspace=self.tools.workspace)
+        policy.set_auto_approve(True)
+        self.model([
+            tool_reply(call("builtin", "write_file", {"path": "input.txt", "content": "changed"}),
+                       call("shell", "run_shell", {"command": "echo changed>input.txt"})),
+            tool_reply(call("proposal", "run_shell", {"command": "type input.txt > proposal.txt"})),
+            answer("提案已另存"),
+        ])
+        self.run_agent("保护样本并另存", policy)
+        results = {row["call_id"]: row for row in self.agent.run_state.tool_results}
+        self.assertEqual(results["builtin"]["code"], "policy_denied")
+        self.assertFalse(results["shell"]["ok"])
+        self.assertTrue(results["proposal"]["ok"])
+        self.assertEqual(protected.read_bytes(), b"original")
+        self.assertEqual((self.workspace / "proposal.txt").read_bytes(), b"original")
 
     def test_real_write_boundary_read_scope_and_environment(self):
         code = ("import os; from pathlib import Path; "

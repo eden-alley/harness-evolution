@@ -19,11 +19,20 @@ class ExecutionBackend(Protocol):
 
 
 class CodexWindowsSandboxBackend:
+    def __init__(self, read_only_paths=()):
+        self.read_only_paths = tuple(read_only_paths)
+
     @property
     def binding(self) -> dict:
-        return {'name': 'codex_windows_mxc', 'policy_version': 1}
+        identity = {'name': 'codex_windows_mxc', 'policy_version': 1}
+        if self.read_only_paths:
+            identity['read_only_paths'] = [str(path) for path in self.read_only_paths]
+        return identity
 
     def run(self, command, workspace, timeout, *, shell='cmd') -> subprocess.CompletedProcess:
+        if self.read_only_paths:
+            return sandbox.run_in_sandbox(command, workspace, timeout, shell=shell,
+                                          read_only_paths=self.read_only_paths)
         if shell == 'cmd':
             return sandbox.run_in_sandbox(command, workspace, timeout)
         return sandbox.run_in_sandbox(command, workspace, timeout, shell=shell)

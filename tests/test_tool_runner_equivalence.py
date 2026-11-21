@@ -1,6 +1,7 @@
 """Portable v0.38 differential oracle: separate imports, processes and effects.
 
 The ZIP is immutable baseline source, never a wrapper around candidate Agent.
+Both children use the same historical Shell description for this comparison.
 Only temporary absolute paths and checkpoint source fingerprints are normalized;
 UUIDs are a fixed per-process sequence. Text, hashes of evidence, order, usage,
 permission decisions and every checkpoint attempt remain comparison inputs.

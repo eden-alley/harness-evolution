@@ -3,9 +3,17 @@ import subprocess
 from unittest.mock import Mock
 
 from scenario_support import OfflineScenario, tools, permissions, answer, call, tool_reply
+from shell_schema_fixtures import CURRENT_SHELL_DESCRIPTION
 
 
 class ShellOptionTests(OfflineScenario):
+    def test_model_sees_shell_and_file_tools_share_the_workspace_root(self):
+        self.model([answer("done")])
+        self.run_agent("验证项目", self.agent.permissions)
+        schema = next(tool["function"] for tool in self.requests[0]["tools"]
+                      if tool["function"]["name"] == "run_shell")
+        self.assertEqual(schema["description"], CURRENT_SHELL_DESCRIPTION)
+
     def test_known_mxc_bash_failure_is_explicit_and_does_not_retry(self):
         runner = Mock(return_value=subprocess.CompletedProcess([], 3221225794, b"",
             b"NtCreateDirectoryObject(\\BaseNamedObjects\\msys): 0xC0000022"))
@@ -14,6 +22,9 @@ class ShellOptionTests(OfflineScenario):
         self.assertEqual(result.code, "shell_unavailable")
         self.assertIn("MXC", result.message)
         self.assertIn("执行状态需核实", result.message)
+        self.assertIn('shell="cmd"', result.message)
+        self.assertEqual(result.exit_code, 3221225794)
+        self.assertIn("NtCreateDirectoryObject", result.data)
         runner.assert_called_once()
 
     def test_bash_selection_and_limits_pass_through_permission_and_runner(self):

@@ -263,7 +263,7 @@ class Agent:
                     if self.checkpoint_store.pending(saved):
                         return RunResult('存在未完成检查点，请先 /resume 或 /new。', 'error')
                     self._checkpoint_session_id = saved['session_id'] if saved else uuid4().hex
-                    self._checkpoint_binding = checkpoints.binding(self)
+                    self._checkpoint_binding = checkpoints.binding(self, verifier=verifier)
                 self.run_state = RunState(run_id=uuid4().hex, user_input=user_input,
                                           phase='preparing', requires_verifier=verifier is not None,
                                           limit_started_at=limits.clock() if self.wall_time_limit_seconds else None)
@@ -277,13 +277,15 @@ class Agent:
         except checkpoints.CheckpointError as error:
             return RunResult(str(error), 'error')
 
-    def inspect_checkpoint(self, snapshot=None):
+    def inspect_checkpoint(self, snapshot=None, *, verifier=None):
         try:
             saved = snapshot if snapshot is not None else self.checkpoint_store.load()
             if not saved or saved['status'] == 'idle':
                 return {'status': 'none', 'reason': '没有可恢复检查点'}
             checkpoints.validate(saved)
-            if saved['binding'] != checkpoints.binding(self):
+            saved_binding = saved['binding'].copy()
+            saved_command = saved_binding.pop(checkpoints.CHECK_COMMAND_SHA256, None)
+            if saved_binding != checkpoints.binding(self):
                 return {'status': 'blocked', 'reason': '检查点源码、工作区、工具、模型或额度配置不匹配'}
             state = saved['run_state']
             if any(r['status'] == 'executing' for r in state['call_records'].values()):
@@ -291,12 +293,20 @@ class Agent:
             if state['next_action'] == 'finished':
                 return {'status': 'finished', 'reason': '任务已停止，只需同步会话'}
             if state['requires_verifier']:
-                return {'status': 'blocked', 'reason': '自定义验收任务暂不支持跨进程续跑'}
+                if saved_command is None:
+                    return {'status': 'blocked', 'reason': '自定义验收任务暂不支持跨进程续跑'}
+                if (state['request_inflight'] == 'verification'
+                        or (state['next_action'] == 'candidate' and state['phase'] == 'verifying')):
+                    return {'status': 'blocked', 'reason': '验收已启动但任务尚未落定，恢复时禁止重跑检查命令'}
+                if saved_command != checkpoints.check_command_digest(verifier):
+                    return {'status': 'blocked', 'reason': '请通过 /check 重新配置原验收命令后再 /resume'}
+            elif verifier is not None:
+                return {'status': 'blocked', 'reason': '原任务未配置验收命令，请直接 /resume'}
             return {'status': 'ready', 'reason': '可通过 /resume 显式继续'}
         except (checkpoints.CheckpointError, ValueError, TypeError, KeyError, OSError) as error:
             return {'status': 'blocked', 'reason': str(error)}
 
-    def resume(self, snapshot=None):
+    def resume(self, snapshot=None, *, verifier=None):
         if self.checkpoint_store is None:
             return RunResult('未配置检查点存储', 'error')
         try:
@@ -304,7 +314,7 @@ class Agent:
                 saved = self.checkpoint_store.load()
                 if snapshot is not None and snapshot != saved:
                     return RunResult('检查点已变化，不能恢复旧副本', 'error')
-                decision = self.inspect_checkpoint(saved)
+                decision = self.inspect_checkpoint(saved, verifier=verifier)
                 if decision['status'] not in ('ready', 'finished'):
                     return RunResult(decision['reason'], 'error')
                 state = checkpoints.restore_state(saved['run_state'])
@@ -326,7 +336,7 @@ class Agent:
                         state.next_action = 'prepare'  # 已消耗的执行轮数不退还。
                     state.request_inflight = None
                 state.phase, state.result = 'preparing', None
-                return self._run_loop(None, resumed=True)
+                return self._run_loop(verifier, resumed=True)
         except KeyboardInterrupt:
             self.run_state.phase, self.run_state.result = 'interrupted', None
             self._note_interruption('恢复过程被用户中断。')

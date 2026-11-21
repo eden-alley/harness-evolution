@@ -13,6 +13,7 @@ from mcp_adapter import MCPStartupError, open_mcp
 from permissions import PermissionManager, Workspace
 from prompts import SYSTEM
 from tools import Toolset
+from verification import command_verifier
 
 
 def limit_setting(name, default, parse):
@@ -36,6 +37,14 @@ def tool_setting():
     if not isinstance(names, list):
         raise ValueError("AGENT_TOOLS 必须是 JSON 数组；省略表示默认，[] 表示无工具")
     return names
+
+
+def configured_workspace():
+    try:
+        read_only = json.loads(os.environ.get("AGENT_READ_ONLY_PATHS", "[]"))
+    except json.JSONDecodeError as error:
+        raise ValueError("AGENT_READ_ONLY_PATHS 必须是 JSON 路径数组。") from error
+    return Workspace(os.environ.get("NAMI_WORKSPACE", os.getcwd()), read_only_paths=read_only)
 
 
 def create_agent(*, mcp=None, workspace=None):
@@ -66,7 +75,7 @@ def create_agent(*, mcp=None, workspace=None):
     if not trusted_default and not key_env:
         raise ValueError('自定义模型地址必须明确配置 MODEL_API_KEY_ENV，不自动沿用 DeepSeek 密钥')
     if workspace is None:
-        workspace = Workspace(os.environ.get("NAMI_WORKSPACE", os.getcwd()))
+        workspace = configured_workspace()
     toolset = Toolset(workspace, mcp=mcp, task_progress=task_progress == 'on', enabled_tools=selected_tools)
     if key_env:
         api_key = os.environ.get(key_env)
@@ -155,8 +164,8 @@ def sync_session(agent, store):
             cp.acknowledge()
 
 
-def handle_resume(agent, store):
-    result = agent.resume()
+def handle_resume(agent, store, verifier=None):
+    result = agent.resume() if verifier is None else agent.resume(verifier=verifier)
     print('\n' + result.text + '\n')
     cp = agent.checkpoint_store
     if cp is not None:
@@ -177,7 +186,9 @@ def recovery_pending(agent):
 def main(agent=None, store=None):
     terminal = agent is None
     config_path = os.environ.get("NAMI_MCP_CONFIG") if terminal else None
-    workspace = Workspace(os.environ.get("NAMI_WORKSPACE", os.getcwd())) if config_path else None
+    workspace = configured_workspace() if terminal else None
+    if config_path and workspace.read_only_paths:
+        raise SystemExit("启用项目只读规则时，本会话仅使用内置工具和原生 Shell。")
     connection = open_mcp(config_path, workspace=workspace.root) if config_path else nullcontext()
     try:
         with connection as mcp:
@@ -212,6 +223,7 @@ def run_session(agent, store, *, terminal):
 
 
 def interact(agent, store):
+    next_verifier = None
     while True:
         q = input("你> ").strip()
         if q in ("exit", "quit"):
@@ -226,17 +238,29 @@ def interact(agent, store):
             else:
                 print("用法：/tools 查看当前可用工具；更改 AGENT_TOOLS 后重启生效。")
             continue
+        if command and command[0] == "/check":
+            if len(command) == 1:
+                print("用法：/check <检查命令>，随后输入任务，或用原检查命令配置后 /resume。")
+            elif not agent.tools.is_available("run_shell"):
+                print("请先启用 run_shell，再配置交付检查。")
+            else:
+                next_verifier = command_verifier(q.split(maxsplit=1)[1])
+                print("已为下一次任务或 /resume 配置交付检查。")
+            continue
         if q == "/new":
             start_new_session(agent, store)
+            next_verifier = None
             continue
         if q == '/resume':
-            handle_resume(agent, store)
+            verifier, next_verifier = next_verifier, None
+            handle_resume(agent, store, verifier)
             continue
         if recovery_pending(agent):
             print('存在未完成检查点，请先 /resume 或 /new；尚未请求模型。')
             continue
+        verifier, next_verifier = next_verifier, None
         try:
-            result = agent.run(q)
+            result = agent.run(q) if verifier is None else agent.run(q, verifier=verifier)
             print("\n" + result.text + "\n")
         finally:
             sync_session(agent, store)

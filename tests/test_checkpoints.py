@@ -9,7 +9,7 @@ import sys
 from unittest.mock import patch
 
 from scenario_support import OfflineScenario, agent, cli, context, permissions, tools, answer, call, tool_reply
-from verification import CheckResult
+from verification import CheckResult, command_verifier
 from test_context import history
 from checkpoint_backend import CheckpointFixtureBackend
 
@@ -255,6 +255,72 @@ class CheckpointScenarios(OfflineScenario):
         result = self.resume()
         self.assertEqual(result.stop_reason, 'error')
         self.assertIn('验收', result.text)
+        self.assertEqual(self.cp.path.read_bytes(), saved)
+        self.assertEqual(len(self.all_requests), 1)
+
+    def test_terminal_resume_requires_the_original_check_and_keeps_recorded_receipt(self):
+        command = 'check original output'
+        receipt = self.workspace / 'receipt.txt'
+        checks = []
+
+        def run_check(actual, workspace, timeout):
+            checks.append(actual)
+            self.assertEqual((workspace / receipt.name).read_text(), 'recorded')
+            return subprocess.CompletedProcess(actual, 0, b'checked', b'')
+
+        self.tools.run_command = run_check
+        self.model([tool_reply(call('receipt', 'write_file', {'path': receipt.name, 'content': 'recorded'})),
+                    answer('已完成')])
+        self.enable()
+        self.agent.permissions.set_auto_approve(True)
+        self.interrupt_after_save(lambda state: any(r['status'] == 'recorded'
+                                                     for r in state['call_records'].values()))
+        self.interrupted_run(verifier=command_verifier(command))
+        original = self.cp.path.read_bytes()
+        mtime = receipt.stat().st_mtime_ns
+
+        for inputs in (['/resume', 'exit'], ['/check replacement', '/resume', 'exit']):
+            self.restart()
+            self.agent.permissions.set_auto_approve(True)
+            with patch('builtins.input', side_effect=inputs), contextlib.redirect_stdout(io.StringIO()):
+                cli.main(self.agent, self.store)
+            self.assertEqual(self.cp.path.read_bytes(), original)
+            self.assertEqual(len(self.all_requests), 1)
+            self.assertEqual(checks, [])
+
+        self.restart()
+        self.agent.permissions.set_auto_approve(True)
+        with patch('builtins.input', side_effect=['/check ' + command, '/resume', 'exit']), \
+                contextlib.redirect_stdout(io.StringIO()):
+            cli.main(self.agent, self.store)
+        self.assertEqual(checks, [command])
+        self.assertEqual(self.agent.run_state.result.verification.status, 'pass')
+        self.assertEqual(receipt.stat().st_mtime_ns, mtime)
+        self.assertEqual(len(self.all_requests), 2)
+
+    def test_terminal_does_not_repeat_a_check_interrupted_before_finalization(self):
+        command = 'check saved output'
+        calls = []
+
+        def run_check(actual, workspace, timeout):
+            calls.append(actual)
+            return subprocess.CompletedProcess(actual, 0, b'checked', b'')
+
+        self.tools.run_command = run_check
+        self.model([answer('候选')])
+        self.enable()
+        self.agent.permissions.set_auto_approve(True)
+        self.interrupt_after_save(lambda state: state['next_action'] == 'candidate'
+                                  and state['verification'] is not None)
+        self.interrupted_run(verifier=command_verifier(command))
+        saved = self.cp.path.read_bytes()
+        self.restart()
+        self.agent.permissions.set_auto_approve(True)
+        with patch('builtins.input', side_effect=['/check ' + command, '/resume', 'exit']), \
+                contextlib.redirect_stdout(io.StringIO()) as output:
+            cli.main(self.agent, self.store)
+        self.assertEqual(calls, [command])
+        self.assertIn('重跑', output.getvalue())
         self.assertEqual(self.cp.path.read_bytes(), saved)
         self.assertEqual(len(self.all_requests), 1)
 

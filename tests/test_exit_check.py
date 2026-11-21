@@ -4,11 +4,11 @@ import io
 import json
 import subprocess
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import httpx
 
-from scenario_support import OfflineScenario, agent, permissions, answer, call, tool_reply
+from scenario_support import OfflineScenario, agent, cli, permissions, answer, call, tool_reply
 from verification import CheckResult, ModelVerifier, command_verifier
 
 
@@ -21,6 +21,109 @@ class ExitCheckScenarios(OfflineScenario):
     def model_verifier(self, criteria="内容必须来自实际读取的文件"):
         return ModelVerifier(self.agent.model_adapter, criteria,
                              self.agent.token_usage.record)
+
+    def test_missing_and_empty_deliveries_return_for_repair_before_model_review(self):
+        for initial in (None, ""):
+            with self.subTest(initial=initial):
+                path = "missing.md" if initial is None else "empty.md"
+                if initial is not None:
+                    (self.workspace / path).write_text(initial, encoding="utf-8")
+                self.check_requests.clear()
+                self.requests.clear()
+                self.model([
+                    answer("报告已完成"),
+                    tool_reply(call("repair", "write_file", {"path": path, "content": "已核对正文"})),
+                    answer("修复后提交"),
+                ], check_replies=[verdict("pass", "正文已交付")])
+                verifier = ModelVerifier(self.agent.model_adapter, "检查报告正文",
+                                         self.agent.token_usage.record, artifact_path=path)
+                policy = permissions.PermissionManager(workspace=self.tools.workspace, ask=lambda *_: ("y", ""))
+                self.run_agent("交付报告", policy, verifier=verifier)
+                self.assertEqual(self.last_result.stop_reason, "end_turn")
+                self.assertEqual(len(self.check_requests), 1)
+                self.assertIn(path, self.requests[1]["messages"][-1]["content"])
+                self.assertEqual([event["status"] for event in self.agent.events
+                                  if event["type"] == "verification"], ["fail", "pass"])
+
+    def test_artifact_review_uses_the_saved_version_on_both_attempts(self):
+        path = "report.md"
+        wrong = "request_preview 调用 decode。"
+        corrected = "request_preview 直接调用 build_request。"
+        self.model([
+            tool_reply(call("first", "write_file", {"path": path, "content": wrong})),
+            answer("报告已完成"),
+            tool_reply(call("fix", "write_file", {"path": path, "content": corrected})),
+            answer("报告已更正"),
+        ], check_replies=[verdict("fail", "调用链错误"), verdict("pass", "调用链准确")])
+        verifier = ModelVerifier(self.agent.model_adapter, "准确说明实际入口",
+                                 self.agent.token_usage.record, artifact_path=path)
+        policy = permissions.PermissionManager(workspace=self.tools.workspace, ask=lambda *_: ("y", ""))
+        self.run_agent("交付报告", policy, verifier=verifier)
+        initial, repaired = [json.loads(request["messages"][1]["content"]) for request in self.check_requests]
+        self.assertIn(wrong, initial["artifact"]["data"])
+        self.assertIn(corrected, repaired["artifact"]["data"])
+        self.assertNotIn(wrong, json.dumps(repaired, ensure_ascii=False))
+        self.assertEqual(self.last_result.verification.status, "pass")
+
+    def test_artifact_review_declines_incomplete_and_out_of_scope_evidence(self):
+        (self.workspace / "long.md").write_text("超预算的正文\n" * 3000, encoding="utf-8")
+        for path in ("long.md", "../outside.md"):
+            with self.subTest(path=path):
+                self.model([answer("已交付")])
+                verifier = ModelVerifier(self.agent.model_adapter, "核对正文",
+                                         self.agent.token_usage.record, artifact_path=path)
+                self.run_agent("交付报告", self.agent.permissions, verifier=verifier)
+                self.assertEqual(self.last_result.verification.status, "error")
+                self.assertIn(path, self.last_result.verification.reason)
+                self.assertEqual(self.check_requests, [])
+
+    def test_command_verifier_rechecks_current_output_after_agent_self_test(self):
+        policy = permissions.PermissionManager(workspace=self.tools.workspace, ask=lambda *_: ("y", ""))
+        path = "result.txt"
+        snapshots = []
+
+        def check(command, workspace, timeout):
+            value = (workspace / path).read_text(encoding="utf-8")
+            snapshots.append(value)
+            return subprocess.CompletedProcess(command, int(value != "valid"), b"checked\n", b"")
+
+        self.tools.run_command = check
+        self.model([
+            tool_reply(call("initial", "write_file", {"path": path, "content": "valid"})),
+            tool_reply(call("self-test", "run_shell", {"command": "check-output"})),
+            tool_reply(call("stale", "write_file", {"path": path, "content": "invalid"})),
+            answer("自测通过"),
+            tool_reply(call("repair", "write_file", {"path": path, "content": "valid"})),
+            answer("提交修正后的文件"),
+        ])
+        self.run_agent("交付有效结果", policy, verifier=command_verifier("check-output"))
+        self.assertEqual(snapshots, ["valid", "invalid", "valid"])
+        self.assertEqual(self.last_result.verification.status, "pass")
+
+    def test_terminal_check_belongs_to_the_next_task_and_rechecks_after_repair(self):
+        command = 'python -B "project check.py"'
+        artifact = self.workspace / "report.md"
+        artifact.write_text("旧错误", encoding="utf-8")
+        observed = []
+
+        def check(actual_command, workspace, timeout):
+            self.assertEqual(actual_command, command)
+            value = (workspace / "report.md").read_text(encoding="utf-8")
+            observed.append(value)
+            return subprocess.CompletedProcess(command, int(value != "已核对"), b"observed artifact\n", b"")
+
+        self.tools.run_command = check
+        self.agent.permissions = permissions.PermissionManager(workspace=self.tools.workspace, ask=lambda *_: ("y", ""))
+        self.model([answer("草稿已提交"),
+                    tool_reply(call("repair", "write_file", {"path": "report.md", "content": "已核对"})),
+                    answer("修正报告已提交"), answer("后续普通回复")])
+        inputs = ["/check " + command, "交付报告", "说明修改", "exit"]
+        with patch("builtins.input", side_effect=inputs), contextlib.redirect_stdout(io.StringIO()):
+            cli.main(self.agent, self.store)
+        self.assertEqual(observed, ["旧错误", "已核对"])
+        self.assertEqual(artifact.read_text(encoding="utf-8"), "已核对")
+        self.assertEqual(self.agent.messages[-1]["content"], "后续普通回复")
+        self.assertIn("observed artifact", self.requests[1]["messages"][-1]["content"])
 
     def test_optional_model_verifier_uses_task_evidence_and_counts_usage_once(self):
         (self.workspace / "seed.txt").write_text("真实文件内容", encoding="utf-8")

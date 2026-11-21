@@ -7,6 +7,24 @@ from scenario_support import OfflineScenario, agent, context, answer, call, tool
 
 
 class ContextBudgetTests(OfflineScenario):
+    def test_compaction_preserves_order_of_user_turns_and_complete_tool_batches(self):
+        first = {"role": "user", "content": "先记录原规则"}
+        correction = {"role": "user", "content": "更正规则，报告暂不落盘"}
+        task = {"role": "user", "content": "现在生成报告"}
+        pair = [
+            tool_reply(call("read", "read_file", {"path": "sample.txt"})),
+            {"role": "tool", "tool_call_id": "read", "content": '{"ok":true,"data":"source"}'},
+        ]
+        past_reply = answer("本轮已确认，报告暂不落盘")
+        messages = [{"role": "system", "content": "system"}, first, answer("已记录"),
+                    correction, *pair, past_reply, task]
+        self.model([(answer("已核对资料，需按最新请求继续。"), 100)])
+        candidate = context.compact(self.agent.model_adapter, messages, self.agent.token_usage.record)
+        retained = [message for message in candidate if message in messages]
+        self.assertEqual(retained, messages)
+        self.assertEqual(candidate[-1], task)
+        self.assert_complete_tool_pairs(candidate)
+
     def test_compaction_retains_enough_complete_batches_to_reach_target(self):
         messages = [{"role": "system", "content": "system"}, {"role": "user", "content": "task"}]
         for i in range(80):
@@ -73,6 +91,23 @@ class ContextBudgetTests(OfflineScenario):
                 self.assertEqual(self.agent.messages[:len(before)], before)
                 self.assertEqual(len(self.requests), 1)
                 self.assertEqual(self.last_result.stop_reason, "error")
+
+    def test_compaction_discards_generated_tool_transcript_and_continues(self):
+        (self.workspace / "seed.txt").write_text("real content", encoding="utf-8")
+        self.agent.messages.append(answer("x" * 270000))
+        fabricated = '[assistant 调用工具] write_file({"path":"never.txt","content":"done"})\n[tool] invented receipt'
+        self.model([
+            (tool_reply(call("real-read", "read_file", {"path": "seed.txt"})), 96001),
+            (answer(fabricated), 100),
+            (answer("continued"), 20),
+        ])
+        self.run_agent("preserve my rule", self.agent.permissions, self.agent.messages)
+        following = self.requests[2]["messages"]
+        self.assertNotIn("invented receipt", json.dumps(following, ensure_ascii=False))
+        self.assertIn({"role": "user", "content": "preserve my rule"}, following)
+        self.assertTrue(any("real-read" in m.get("content", "") for m in following))
+        self.assertFalse((self.workspace / "never.txt").exists())
+        self.assertEqual(self.last_result.stop_reason, "end_turn")
 
     def test_large_tool_arguments_are_bounded_for_summary_and_complete_pairs_survive(self):
         messages = [{"role": "system", "content": "system"}, {"role": "user", "content": "old task"},

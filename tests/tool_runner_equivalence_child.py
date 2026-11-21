@@ -19,6 +19,7 @@ import context
 import permissions
 import tools
 import verification
+from shell_schema_fixtures import CURRENT_SHELL_DESCRIPTION, LEGACY_SHELL_DESCRIPTION
 
 for module in (agent, context, permissions, tools, verification, agent.models, agent.checkpoints):
     assert Path(module.__file__).resolve().parent == source, module.__file__
@@ -31,6 +32,13 @@ if (source / 'tool_runner.py').exists():
     assert sys.modules[runner_module.__name__] is runner_module
 else:
     assert runner_module is None, 'baseline unexpectedly imported a candidate ToolRunner'
+
+# Compare execution under the same textual tool schema. The actual new schema
+# is asserted separately in test_shell_options and the frozen request test.
+shell = tools.TOOLS['run_shell']['schema']['function']
+expected = CURRENT_SHELL_DESCRIPTION if runner_module else LEGACY_SHELL_DESCRIPTION
+assert shell['description'] == expected
+shell['description'] = LEGACY_SHELL_DESCRIPTION
 
 def no_network(*args, **kwargs):
     raise AssertionError('equivalence fixtures forbid network')

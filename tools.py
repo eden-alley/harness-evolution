@@ -240,7 +240,11 @@ def read_file(tools, path, *, start_line=None, end_line=None, _output_chars=MAX_
     limit = _output_bytes if _output_bytes is not None else _output_chars
     lines = []
     size = 0
-    with p.open(encoding="utf-8") as stream:
+    try:
+        stream = p.open(encoding="utf-8")
+    except FileNotFoundError as error:
+        return ToolResult(False, code="file_not_found", message=f"FileNotFoundError: {error}")
+    with stream:
         for _ in range(1, start_line):
             if not stream.readline():
                 return ToolResult(False, code="invalid_arguments", message="起始行超过文件末尾。")
@@ -347,6 +351,8 @@ def edit_file(tools, path, edits):
     p = tools.workspace.resolve(path)
     if p is None:
         return ToolResult(False, code="policy_denied", message="[错误] 路径在工作区之外")
+    if denial := tools.workspace.write_denial(p):
+        return ToolResult(False, code="policy_denied", message=denial)
     try:
         return ToolResult(True, data=apply_file_edits(p, edits, workspace_root=tools.workspace.root))
     except FileEditError as error:
@@ -358,6 +364,8 @@ def write_file(tools, path, content):
     p = tools.workspace.resolve(path)
     if p is None:
         return ToolResult(False, code="policy_denied", message="[错误] 路径在工作区之外")
+    if denial := tools.workspace.write_denial(p):
+        return ToolResult(False, code="policy_denied", message=denial)
     try:
         return ToolResult(True, data=write_whole_file(p, content, workspace_root=tools.workspace.root))
     except FileEditError as error:
@@ -381,13 +389,19 @@ def _decode_command_output(data):
     return text.replace("\r\n", "\n").replace("\r", "\n")
 
 
-@tool("run_shell", "通过配置的执行后端运行命令。内置后端为 Windows 原生沙箱，默认 cmd（for 变量 %%），可选 Git Bash。Windows .cmd 脚本使用 cmd。",
+@tool("run_shell", '通过配置的执行后端运行命令。每次从 list_dir(".") 对应的工作区根目录启动；项目文件用相对于该目录的路径。'
+      '解释器的绝对路径只用于调用解释器，直接传入相对的脚本路径即可，无需切换目录。'
+      '内置后端为 Windows 原生沙箱，默认 cmd（for 变量 %%），可选 Git Bash。Windows .cmd 脚本使用 cmd。',
       {"type": "object", "required": ["command"], "additionalProperties": False,
        "properties": {"command": {"type": "string", "description": "对应 Shell 语法的命令"},
                       "shell": {"type": "string", "enum": ["cmd", "bash"], "default": "cmd"},
                       "timeout": {"type": "number", "exclusiveMinimum": 0, "maximum": 300,
                                   "description": "秒，默认 30，上限 300"}}})
 def run_shell(tools, command, timeout=30, shell="cmd"):
+    if tools.workspace.read_only_paths and (
+            not tools._uses_backend() or type(tools._backend) is not CodexWindowsSandboxBackend
+            or tools._backend.read_only_paths != tools.workspace.read_only_paths):
+        return ToolResult(False, code="policy_denied", message="项目只读规则要求使用原生 Shell 执行器。")
     try:
         if shell == "cmd":
             p = tools.run_command(command, tools.workspace.root, timeout)
@@ -401,7 +415,8 @@ def run_shell(tools, command, timeout=30, shell="cmd"):
     output = f"[exit {p.returncode}]\n{_decode_command_output(p.stdout)}{_decode_command_output(p.stderr)}"
     if p.returncode and shell == "bash" and "NtCreateDirectoryObject" in output and "0xC0000022" in output:
         return ToolResult(False, data=output, exit_code=p.returncode, code="shell_unavailable",
-                          message="检测到 Git Bash/MSYS 在 MXC 中初始化失败；执行状态需核实，请勿盲目重试。")
+                          message='检测到 Git Bash/MSYS 在 MXC 中初始化失败；执行状态需核实，请勿盲目重试。'
+                                  '如可用，请从工作区根目录用 shell="cmd" 执行等价命令。')
     return ToolResult(p.returncode == 0, data=output, exit_code=p.returncode,
                       code="execution_error" if p.returncode else "",
                       message="命令非零退出" if p.returncode else "")
@@ -460,7 +475,11 @@ class Toolset:
         self.file_search = FileSearch(workspace.root)
         if run_command is not None and backend is not None:
             raise ValueError("backend 与 run_command 不能同时指定")
-        self._backend = None if run_command is not None else (backend if backend is not None else CodexWindowsSandboxBackend())
+        if workspace.read_only_paths and any(value is not None for value in (run_command, backend, mcp)):
+            raise ValueError("项目只读规则仅支持内置工具和原生 Shell 执行器。")
+        self._backend = backend
+        if backend is None and run_command is None:
+            self._backend = CodexWindowsSandboxBackend(workspace.read_only_paths)
         self.run_command = run_command if run_command is not None else self._backend.run
         if mcp is not None and TOOLS.keys() & mcp.tools.keys():
             raise ValueError("MCP 工具名与原生工具冲突")

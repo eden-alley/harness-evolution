@@ -12,6 +12,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from scenario_support import OfflineScenario, agent, cli, context, permissions, tools, answer, call, tool_reply
+from shell_schema_fixtures import CURRENT_SHELL_DESCRIPTION, LEGACY_SHELL_DESCRIPTION
 from verification import CheckResult
 
 
@@ -347,6 +348,9 @@ class TaskProgressScenarios(OfflineScenario):
                         position = next(i for i, schema in enumerate(expected["tools"])
                                         if schema["function"]["name"] == name)
                         expected["tools"][position] = deepcopy(tools.TOOLS[name]["schema"])
+                    shell = next(s["function"] for s in expected["tools"] if s["function"]["name"] == "run_shell")
+                    self.assertEqual(shell["description"], LEGACY_SHELL_DESCRIPTION)
+                    shell["description"] = CURRENT_SHELL_DESCRIPTION
                     expected.update(expected.pop("extra_body"))
                     self.assertEqual(self.requests[0], expected)
                     self.assertEqual(self.agent.messages[:-1], history)

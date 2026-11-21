@@ -6,6 +6,8 @@
 目标是构建一个小而完整、容易扩展、行为可验证的基础内核。每次改动需要说明解决了什么问题，
 通过可复现测试和版本对照留下依据。当前为单机、同步、Windows 优先的实现，可靠性边界仍在逐项完善。
 
+当前候选版在正式二十题的 19 道有效题上通过 14 道，编程题独立测试通过 6/8。发布版本仍为 v0.41。[五项改动、方法来源与回归清单](docs/validation/2026-11-20-five-area-candidate.md)
+
 ## 已实现的能力
 
 - **执行循环**：模型请求、批量工具调用、结果回写和继续推理；每次运行有独立的状态与停止原因。
@@ -77,6 +79,18 @@ New-Item -ItemType Directory -Force -Path $env:NAMI_WORKSPACE | Out-Null
 
 `NAMI_WORKSPACE` 默认是启动时的当前目录。未完成检查点存在时，先使用 `/resume` 或 `/new`，
 程序不会在启动时自行继续执行。
+
+## 项目只读路径
+
+启动前可在可信终端指定工作区一级的现有文件或目录。以下规则允许读取 `settings.json` 和
+`reference` 中的资料，写入应选工作区内其他路径。
+
+~~~powershell
+$env:AGENT_READ_ONLY_PATHS = '["settings.json","reference"]'
+~~~
+
+文件工具和默认 Windows 原生 Shell 使用同一份规则。`/auto` 仍遵守只读限制，恢复检查点时
+会校验规则是否相同。启用规则的会话使用内置工具和默认 Shell，`NAMI_MCP_CONFIG` 应留空。
 
 ## 本地 MCP 试点
 
@@ -296,9 +310,9 @@ $env:AGENT_TOOLS = '["list_dir","find_files","search_text","read_file","read_too
 - 权限检查使用参数快照，回调修改参数会导致拒绝执行。
 
 默认 `run_shell` 经过 `CodexWindowsSandboxBackend`，调用 `codex.exe sandbox` 的 Windows MXC 执行层，使用 cmd 批处理语法。
-可显式选择 `shell="bash"` 使用已安装的 Git Bash，确认界面显示所选 Shell。
-2026-11-12 本机验收发现 MXC 拒绝 MSYS 命名对象初始化，Git Bash 管道验收未通过。
-识别到该错误时返回 `shell_unavailable` 和原始输出，供后续诊断。
+本机已通过 MXC 内的 cmd 管道验证。Git Bash 仍可显式请求，兼容性待验收。
+本机对照确认同一 Bash 管道在普通进程可用，在 MXC 中因 MSYS 初始化失败无法启动。
+遇到该错误会返回 `shell_unavailable` 和原始输出。等价命令可以由调用方明确选择 `shell="cmd"`，仍经过 MXC。
 原生执行器必须位于工作区外；缺失、启动失败或不支持时明确失败，不回退宿主 shell。
 单条命令默认 30 秒超时，可用 `timeout` 在 0–300 秒内配置（大于 0）。
 中断与超时会清理进程树，超时尽量保留已有输出，编码兼容 UTF-8 / GBK。
@@ -307,7 +321,8 @@ $env:AGENT_TOOLS = '["list_dir","find_files","search_text","read_file","read_too
 子进程环境中的模拟 API key 已被过滤；同一进程却能读取 `HKCU\Environment` 中的模拟凭证。
 因此当前 MXC 配置不能保证 API key 等敏感凭证隔离，不适合作为运行恶意、不可信代码的完整安全边界。
 上游也记录了同类[注册表读取问题](https://github.com/microsoft/mxc/issues/1670)。
-本次没有读取真实凭证，也没有修改已有用户环境变量。新增注册表验收会保留失败，直至问题实际解决。
+对只需文件操作的任务，可用 `AGENT_TOOLS` 启用 `list_dir`、`read_file`、`write_file` 和 `edit_file`。
+这会从工具目录移除 `run_shell`，并阻断命令验收调用。注册表隔离仍是启用不可信命令执行的独立验收项。
 
 `fetch_url` 在宿主进程执行，允许本机和内网可达地址；
 它受 URL 协议、重定向次数、I/O 超时和 2 MiB 响应大小限制，不属于命令沙箱的网络隔离。
@@ -425,6 +440,12 @@ $env:AGENT_TASK_PROGRESS = 'on'
 
 ## 按任务验收
 
+终端输入 `/check python -B -m unittest discover -s tests`，随后输入任务。
+提交时会运行这条检查命令，失败结果会交回主模型修正一次，再运行同一条检查。
+该命令绑定下一次任务，执行仍经过 Shell 权限与沙箱。输入 `/new` 可清除待用的检查并开始新会话。
+如果带检查的任务在提交前中断，重启后重新输入原 `/check` 命令，再用 `/resume` 继续。
+恢复会核对命令摘要，并保留已记录的工具操作。验收已经开始但任务状态尚未落定时，保留检查点供核实。
+
 终端默认不绑定验收器。程序调用方可传入 `verifier(VerificationInput) -> CheckResult`，
 优先复用任务已有的测试或检查命令：
 
@@ -446,6 +467,9 @@ result = runtime.run(
 
 也可显式配置 `ModelVerifier(runtime.model_adapter, criteria, runtime.token_usage.record)`，
 必须提供明确条件。模型验收只接收本任务证据、不执行工具，其判断仍需要独立评测检验。
+验收落盘报告时，调用方可给 `ModelVerifier` 传入 `artifact_path="report.md"`。
+每次提交经原有权限读取当前 UTF-8 文件。文件缺失或为空时退回补齐，读取失败或内容超出单次读取上限时报告验收错误。
+能够完整读取时才会把报告正文交给验收模型。
 
 ## 测试与工程化证据
 

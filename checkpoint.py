@@ -13,11 +13,12 @@ from uuid import uuid4
 
 from context import atomic_write_json, render_tool_result
 from tools import ToolResult, TOOLS
-from verification import CheckResult
+from verification import CheckResult, CommandVerifier
 from .state import RunResult, RunState
 from .model_openai import _message
 
 SCHEMA_VERSION = 1
+CHECK_COMMAND_SHA256 = 'check_command_sha256'
 
 
 class CheckpointError(RuntimeError):
@@ -29,7 +30,13 @@ def _digest(value):
                                      allow_nan=False).encode('utf-8')).hexdigest()
 
 
-def binding(runtime):
+def check_command_digest(verifier):
+    if type(verifier) is CommandVerifier and isinstance(verifier.command, str):
+        return hashlib.sha256(verifier.command.encode('utf-8')).hexdigest()
+    return None
+
+
+def binding(runtime, *, verifier=None):
     source = {path.name: hashlib.sha256(path.read_bytes()).hexdigest()
               for path in sorted(Path(__file__).parent.glob('*.py'))}
     model = runtime.model_adapter
@@ -39,7 +46,7 @@ def binding(runtime):
     mcp = getattr(runtime.tools, 'mcp', None)
     if mcp is not None:
         tools = {'schemas': tools, 'mcp': mcp.binding}
-    return {
+    result = {
         'source': _digest(source),
         'workspace': os.path.normcase(str(runtime.tools.workspace.root.resolve())),
         'tools': _digest(tools),
@@ -54,6 +61,10 @@ def binding(runtime):
                    'compact_target_max': runtime.compact_target_max,
                    'wall_time_limit_seconds': runtime.wall_time_limit_seconds},
     }
+    command_digest = check_command_digest(verifier)
+    if command_digest is not None:
+        result[CHECK_COMMAND_SHA256] = command_digest
+    return result
 
 
 def capture(runtime, session_id, runtime_binding):
@@ -112,6 +123,11 @@ def validate(snapshot):
         raise ValueError('检查点请求与执行位置不一致')
     if type(state['requires_verifier']) is not bool or not isinstance(snapshot.get('binding'), dict):
         raise ValueError('检查点恢复配置无效')
+    if CHECK_COMMAND_SHA256 in bound:
+        command_digest = bound[CHECK_COMMAND_SHA256]
+        if (not state['requires_verifier'] or not isinstance(command_digest, str)
+                or not re.fullmatch('[0-9a-f]{64}', command_digest)):
+            raise ValueError('检查点验收命令摘要无效')
     messages = snapshot.get('messages')
     if not isinstance(messages, list) or not messages or any(not isinstance(m, dict) for m in messages):
         raise ValueError('检查点消息无效')

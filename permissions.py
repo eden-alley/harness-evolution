@@ -15,8 +15,18 @@ from urllib.parse import urlsplit
 
 class Workspace:
     """文件工具与权限检查共用的路径边界。"""
-    def __init__(self, root):
+    def __init__(self, root, *, read_only_paths=()):
         self.root = Path(root).resolve()
+        if not isinstance(read_only_paths, (list, tuple)) or any(
+                not isinstance(path, str) or not path.strip() for path in read_only_paths):
+            raise ValueError("AGENT_READ_ONLY_PATHS 必须是非空路径组成的 JSON 数组。")
+        resolved = set()
+        for path in read_only_paths:
+            target = self.resolve(path)
+            if target is None or target.parent != self.root or not (target.is_file() or target.is_dir()):
+                raise ValueError(f"只读路径 {path!r} 必须是工作区一级的现有文件或目录。")
+            resolved.add(target)
+        self.read_only_paths = tuple(sorted(resolved))
 
     def resolve(self, path_str):
         path = Path(path_str).expanduser()
@@ -24,6 +34,11 @@ class Workspace:
             path = self.root / path
         path = path.resolve()
         return path if path.is_relative_to(self.root) else None
+
+    def write_denial(self, target):
+        if any(target.is_relative_to(path) for path in self.read_only_paths):
+            return f"项目规则将 {target.relative_to(self.root).as_posix()!r} 设为只读，请选择其他输出路径。"
+        return None
 
 
 class Risk(Enum):
@@ -148,8 +163,11 @@ class PermissionManager:
             return fetch_url_denial(args.get("url", ""))
         if name in ("read_file", "write_file", "edit_file", "list_dir", "find_files", "search_text"):
             path = args.get("path", ".")
-            if self.workspace.resolve(path) is None:
+            target = self.workspace.resolve(path)
+            if target is None:
                 return f"路径 {path!r} 在工作区 {self.workspace.root} 之外，禁止访问。"
+            if name in ("write_file", "edit_file"):
+                return self.workspace.write_denial(target)
         if name == "run_shell":
             cmd = args.get("command", "")
             for pat in SHELL_DENY_PATTERNS:

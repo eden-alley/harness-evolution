@@ -185,7 +185,7 @@ class AgentLoopScenarios(OfflineScenario):
         for call_id, code in {"json": "invalid_arguments", "bad-args": "invalid_arguments",
                               "unknown": "tool_unavailable", "denied": "user_denied",
                               "outside": "policy_denied", "danger": "policy_denied",
-                              "missing": "execution_error", "timeout": "execution_error"}.items():
+                              "missing": "file_not_found", "timeout": "execution_error"}.items():
             self.assertEqual(json.loads(outputs[call_id])["code"], code)
         for name, args in [("read_file", {"path": "../outside.txt"}),
                            ("list_dir", {"path": ".."}),

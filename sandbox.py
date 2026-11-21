@@ -2,6 +2,7 @@
 
 只调用 sandbox 子命令，不调用模型；启动失败时不回退为宿主机直接执行。
 """
+import json
 import os
 from pathlib import Path
 import subprocess
@@ -62,7 +63,7 @@ def _terminate_tree(process):
     return output
 
 
-def run_in_sandbox(command, workspace, timeout, *, shell="cmd"):
+def run_in_sandbox(command, workspace, timeout, *, shell="cmd", read_only_paths=()):
     if shell not in ("cmd", "bash"):
         raise ValueError("不支持的 shell；请选择 cmd 或 bash。")
     workspace = Path(workspace).resolve(strict=True)
@@ -89,9 +90,14 @@ def run_in_sandbox(command, workspace, timeout, *, shell="cmd"):
     shell_args = ([str(interpreter), "--noprofile", "--norc", "./" + script_path.name]
                   if shell == "bash" else
                   [str(interpreter), "/d", "/s", "/c", ".\\" + script_path.name])
-    argv = [str(executable), "sandbox", "-c", "windows.sandbox=mxc",
-            "--include-managed-config", "--permission-profile", ":workspace",
-            "-C", str(workspace), "--", *shell_args]
+    argv = [str(executable), "sandbox", "-c", "windows.sandbox=mxc", "--include-managed-config"]
+    profile = ":workspace"
+    if read_only_paths:
+        entries = ", ".join(f'{json.dumps(Path(path).as_posix(), ensure_ascii=False)} = "read"'
+                            for path in read_only_paths)
+        profile = "agent_project_read_only"
+        argv.extend(["-c", f'permissions.{profile}={{ extends = ":workspace", filesystem = {{ {entries} }} }}'])
+    argv.extend(["--permission-profile", profile, "-C", str(workspace), "--", *shell_args])
     try:
         with subprocess.Popen(argv, shell=False, cwd=workspace, env=environment,
                               stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
